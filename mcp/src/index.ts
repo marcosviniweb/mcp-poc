@@ -1,8 +1,10 @@
+#!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 type ExportEntry = {
   specifier: string;
@@ -17,7 +19,39 @@ type ComponentInfo = {
 
 const server = new McpServer({ name: "lib-components", version: "1.0.0" });
 
-const WORKSPACE_ROOT = path.resolve(process.cwd(), "..");
+// Resolve o workspace relativo ao arquivo compilado em build/index.js
+// Estrutura esperada: <repo>/mcp/build/index.js -> workspace é <repo>
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_WORKSPACE_ROOT = path.resolve(__dirname, "..", "..");
+async function resolveWorkspaceRoot(): Promise<string> {
+  // 1) via env var
+  const fromEnv = process.env.LIB_COMPONENTS_WORKSPACE || process.env.MCP_WORKSPACE_ROOT;
+  if (fromEnv) {
+    const p = path.resolve(fromEnv, PUBLIC_API_RELATIVE);
+    const exists = await readFileIfExists(p);
+    if (exists !== null) return path.resolve(fromEnv);
+  }
+  // 2) via argumento CLI: node index.js <workspaceRoot>
+  const argRoot = process.argv[2];
+  if (argRoot) {
+    const p = path.resolve(argRoot, PUBLIC_API_RELATIVE);
+    const exists = await readFileIfExists(p);
+    if (exists !== null) return path.resolve(argRoot);
+  }
+  const candidates = [
+    DEFAULT_WORKSPACE_ROOT,
+    path.resolve(process.cwd()),
+    path.resolve(process.cwd(), ".."),
+    path.resolve(process.cwd(), "..", ".."),
+  ];
+  for (const root of candidates) {
+    const p = path.resolve(root, PUBLIC_API_RELATIVE);
+    const exists = await readFileIfExists(p);
+    if (exists !== null) return root;
+  }
+  return DEFAULT_WORKSPACE_ROOT;
+}
 const PUBLIC_API_RELATIVE = path.join(
   "projects",
   "my-lib",
@@ -35,12 +69,16 @@ async function readFileIfExists(filePath: string): Promise<string | null> {
 }
 
 async function parseReExports(fileContent: string): Promise<ExportEntry[]> {
-  // very simple parser for lines like: export * from './lib/components';
+  // Suporte a: export * from '...'; e export { X, Y } from '...';
   const exports: ExportEntry[] = [];
   const exportAllRegex = /export\s*\*\s*from\s*['\"](.+?)['\"];?/g;
+  const exportNamedRegex = /export\s*\{[\s\S]*?\}\s*from\s*['\"](.+?)['\"];?/g;
   let match: RegExpExecArray | null;
   while ((match = exportAllRegex.exec(fileContent)) !== null) {
     exports.push({ specifier: "*", fromPath: match[1] });
+  }
+  while ((match = exportNamedRegex.exec(fileContent)) !== null) {
+    exports.push({ specifier: "named", fromPath: match[1] });
   }
   return exports;
 }
@@ -79,9 +117,42 @@ async function collectExportChain(entryFile: string, visited = new Set<string>()
 }
 
 async function listPotentialComponentFiles(): Promise<string[]> {
+  const WORKSPACE_ROOT = await resolveWorkspaceRoot();
   const publicApiPath = path.resolve(WORKSPACE_ROOT, PUBLIC_API_RELATIVE);
   const chain = await collectExportChain(publicApiPath);
-  return chain;
+  if (chain.length > 0) return chain;
+  // Fallback: varrer diretório de componentes por *.component.ts
+  const componentsDir = path.resolve(
+    WORKSPACE_ROOT,
+    "projects",
+    "my-lib",
+    "src",
+    "lib",
+    "components",
+  );
+  async function walk(dir: string, acc: string[] = []): Promise<string[]> {
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      return acc;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry);
+      try {
+        const stat = await fs.stat(full);
+        if (stat.isDirectory()) {
+          await walk(full, acc);
+        } else if (/\.component\.ts$/.test(entry)) {
+          acc.push(full);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return acc;
+  }
+  return await walk(componentsDir);
 }
 
 async function extractComponentInfo(filePath: string): Promise<ComponentInfo[]> {
@@ -112,6 +183,7 @@ server.tool(
   "Lista componentes Angular exportados indiretamente pelo public-api",
   {},
   async () => {
+    const root = await resolveWorkspaceRoot();
     const files = await listPotentialComponentFiles();
     const allInfosArrays = await Promise.all(files.map(extractComponentInfo));
     const infos = allInfosArrays.flat();
@@ -119,7 +191,7 @@ server.tool(
       return { content: [{ type: "text", text: "Nenhum componente encontrado." }] };
     }
     const text = infos
-      .map((c) => `- ${c.name} (${c.selector ?? "sem selector"})\n  arquivo: ${path.relative(WORKSPACE_ROOT, c.file)}`)
+      .map((c) => `- ${c.name} (${c.selector ?? "sem selector"})\n  arquivo: ${path.relative(root, c.file)}`)
       .join("\n");
     return { content: [{ type: "text", text }] };
   },
@@ -130,12 +202,13 @@ server.tool(
   "Obtém detalhes de um componente pelo nome da classe",
   { name: z.string().min(1).describe("Nome da classe do componente, ex.: ButtonComponent") },
   async ({ name }) => {
+    const root = await resolveWorkspaceRoot();
     const files = await listPotentialComponentFiles();
     for (const f of files) {
       const infos = await extractComponentInfo(f);
       const found = infos.find((i) => i.name === name);
       if (found) {
-        const rel = path.relative(WORKSPACE_ROOT, found.file);
+        const rel = path.relative(root, found.file);
         const detail = [
           `Nome: ${found.name}`,
           `Selector: ${found.selector ?? "(não definido)"}`,
