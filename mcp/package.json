@@ -1,0 +1,31 @@
+{
+  "name": "mcp-lib-components",
+  "version": "1.0.0",
+  "description": "Servidor MCP que lista componentes da lib via public-api.ts",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "lib-components": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "start": "node ./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "zod": "^3.23.8"
+  }
+}
+
+
+

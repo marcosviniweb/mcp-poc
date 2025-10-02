@@ -2,22 +2,17 @@
 
 Este repositório contém uma biblioteca Angular (`projects/my-lib`) e um servidor MCP (Model Context Protocol) de prova de conceito que lê dinamicamente os componentes exportados pelo `public-api.ts`.
 
-## Scripts
+## MCP Server simples
 
-- `npm run mcp:dev`: inicia o servidor MCP via stdio.
+Foi adicionado um subprojeto em `mcp/` com um servidor MCP via stdio que lê o `projects/my-lib/src/public-api.ts` e reexports para localizar componentes Angular.
 
-## Estrutura MCP
+- Tools expostas: `list-components` e `get-component`.
 
-- `mcp-server/src/index.ts`: servidor MCP via stdio
-- Ferramentas:
-  - `publicApi`: retorna o conteúdo bruto do `public-api.ts`
-  - `listComponents`: lista os componentes exportados
-  - `componentMetadata`: resolve metadata básica (selector, standalone, imports)
-  - `componentSource`: retorna o código-fonte do componente
+Como usar:
 
-## Configuração
-
-Nenhuma configuração externa é necessária. O servidor resolve caminhos relativos ao workspace atual.
+1. `cd mcp && npm i`
+2. `npm run build`
+3. Configure o cliente MCP para executar `./build/index.js` (stdio)
 
 # PocMcpLib
 
