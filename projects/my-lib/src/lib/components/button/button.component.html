@@ -1,0 +1,13 @@
+<button
+  [attr.type]="type"
+  [disabled]="disabled || loading"
+  [attr.aria-label]="ariaLabel || label || undefined"
+  [class]="computedClass"
+  (click)="onClick($event)"
+>
+  <span *ngIf="loading" class="spinner" aria-hidden="true"></span>
+  <ng-container *ngIf="label; else projected">{{ label }}</ng-container>
+  <ng-template #projected><ng-content></ng-content></ng-template>
+</button>
+
+

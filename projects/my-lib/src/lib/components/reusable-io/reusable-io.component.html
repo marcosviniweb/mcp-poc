@@ -1,0 +1,11 @@
+<label *ngIf="label">{{ label }}</label>
+<input
+  [type]="type"
+  [placeholder]="placeholder"
+  [disabled]="disabled"
+  [(ngModel)]="internalValue"
+  (ngModelChange)="onValueChange($event)"
+/>
+<button type="button" (click)="onSubmit()">{{ submitText }}</button>
+
+
