@@ -143,12 +143,16 @@ async function extractComponentInfo(filePath) {
         return [];
     const infos = [];
     // Match Angular @Component with selector and class name in same file
-    const componentRegex = /@Component\s*\(\s*\{[\s\S]*?selector:\s*['\"]([^'\"]+)['\"][\s\S]*?\}\s*\)\s*export\s+class\s+(\w+)/g;
+    const componentRegex = /@Component\s*\(\s*\{([\s\S]*?)\}\s*\)\s*export\s+class\s+(\w+)/g;
     let match;
     while ((match = componentRegex.exec(content)) !== null) {
-        const selector = match[1];
+        const metaBlock = match[1];
         const className = match[2];
-        infos.push({ name: className, file: filePath, selector });
+        const selectorMatch = /selector\s*:\s*['\"]([^'\"]+)['\"]/m.exec(metaBlock);
+        const selector = selectorMatch?.[1];
+        const standaloneMatch = /standalone\s*:\s*(true|false)/m.exec(metaBlock);
+        const standalone = standaloneMatch ? standaloneMatch[1] === "true" : undefined;
+        infos.push({ name: className, file: filePath, selector, standalone });
     }
     // If no decorator found, still try to find exported class ...Component
     if (infos.length === 0) {
@@ -159,6 +163,139 @@ async function extractComponentInfo(filePath) {
         }
     }
     return infos;
+}
+function extractClassBody(source, className) {
+    const classRegex = new RegExp(`export\\s+class\\s+${className}\\b[^{]*{`, 'm');
+    const m = classRegex.exec(source);
+    if (!m)
+        return null;
+    const startIdx = (m.index || 0) + (m[0]?.length || 0);
+    // brace matching
+    let depth = 1;
+    let i = startIdx;
+    while (i < source.length) {
+        const ch = source[i];
+        if (ch === '{')
+            depth++;
+        else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+                const body = source.slice(startIdx, i);
+                return { body, start: startIdx };
+            }
+        }
+        i++;
+    }
+    return null;
+}
+function cleanWhitespace(s) {
+    return s ? s.replace(/\s+/g, ' ').trim() : s;
+}
+function extractLeadingComment(block, decoratorIndex) {
+    // Look backwards for /** ... */ within ~300 chars
+    const lookBehind = block.slice(Math.max(0, decoratorIndex - 300), decoratorIndex);
+    const m = /\/\*\*([\s\S]*?)\*\//.exec(lookBehind);
+    if (!m)
+        return undefined;
+    const text = m[1]
+        .split('\n')
+        .map((l) => l.replace(/^\s*\*\s?/, '').trim())
+        .join(' ')
+        .trim();
+    return text || undefined;
+}
+function parsePropertyLine(line) {
+    // Example: label?: string;  OR variant: 'a' | 'b' = 'a';
+    const m = /([A-Za-z_][\w]*)\s*(\?)?\s*:\s*([^=;]+)(?:=\s*([^;]+))?/.exec(line);
+    if (!m)
+        return {};
+    const name = m[1];
+    const required = !Boolean(m[2]);
+    const type = cleanWhitespace(m[3]);
+    const defaultValue = cleanWhitespace(m[4]);
+    return { name, type, required, defaultValue };
+}
+function parseEventEmitterType(fragment) {
+    if (!fragment)
+        return undefined;
+    const m = /EventEmitter\s*<\s*([^>]+)\s*>/.exec(fragment);
+    return cleanWhitespace(m?.[1] || undefined);
+}
+function generateSampleFromType(type) {
+    if (!type)
+        return undefined;
+    const t = type.trim();
+    if (/^string$/i.test(t))
+        return '"texto"';
+    if (/^number$/i.test(t))
+        return '0';
+    if (/^boolean$/i.test(t))
+        return 'true';
+    const union = t.match(/'(?:[^']+)'/g);
+    if (union && union.length > 0)
+        return union[0];
+    return undefined;
+}
+async function parseDetailedComponent(filePath, className, selector, standalone) {
+    const source = (await readFileIfExists(filePath)) || '';
+    const classBlock = extractClassBody(source, className);
+    const result = { name: className, file: filePath, selector, standalone, inputs: [], outputs: [] };
+    if (!classBlock)
+        return result;
+    const block = classBlock.body;
+    // Parse @Input
+    const inputRegex = /@Input(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
+    let m;
+    while ((m = inputRegex.exec(block)) !== null) {
+        const aliasRaw = m[1];
+        // read until semicolon
+        const rest = block.slice(m.index + m[0].length);
+        const semi = rest.indexOf(';');
+        if (semi === -1)
+            continue;
+        const line = rest.slice(0, semi);
+        const { name, type, required, defaultValue } = parsePropertyLine(line);
+        if (!name)
+            continue;
+        const alias = aliasRaw ? aliasRaw.replace(/^['\"]|['\"]$/g, '') : undefined;
+        const description = extractLeadingComment(block, m.index) || undefined;
+        result.inputs.push({ name, alias, type, required, defaultValue, description });
+    }
+    // Parse @Output
+    const outputRegex = /@Output(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
+    while ((m = outputRegex.exec(block)) !== null) {
+        const aliasRaw = m[1];
+        const rest = block.slice(m.index + m[0].length);
+        const semi = rest.indexOf(';');
+        if (semi === -1)
+            continue;
+        const line = rest.slice(0, semi);
+        const { name, type } = parsePropertyLine(line);
+        if (!name)
+            continue;
+        const alias = aliasRaw ? aliasRaw.replace(/^['\"]|['\"]$/g, '') : undefined;
+        const eventType = parseEventEmitterType(type);
+        const description = extractLeadingComment(block, m.index) || undefined;
+        result.outputs.push({ name, alias, type: eventType || type, description });
+    }
+    return result;
+}
+function buildUsageSnippet(info) {
+    if (!info.selector)
+        return undefined;
+    const tag = info.selector;
+    const inputs = info.inputs || [];
+    const outputs = info.outputs || [];
+    const bindings = [];
+    for (const i of inputs) {
+        const sample = generateSampleFromType(i.type) || '...';
+        bindings.push(`[${i.alias || i.name}]=${sample}`);
+    }
+    for (const o of outputs) {
+        bindings.push(`(${o.alias || o.name})="on${o.name[0].toUpperCase()}${o.name.slice(1)}($event)"`);
+    }
+    const space = bindings.length ? ' ' : '';
+    return `<${tag}${space}${bindings.join(' ')}></${tag}>`;
 }
 server.tool("list-components", "Lista componentes Angular exportados indiretamente pelo public-api", {}, async () => {
     const root = await resolveWorkspaceRoot();
@@ -180,12 +317,20 @@ server.tool("get-component", "Obtém detalhes de um componente pelo nome da clas
         const infos = await extractComponentInfo(f);
         const found = infos.find((i) => i.name === name);
         if (found) {
-            const rel = path.relative(root, found.file);
+            const detailed = await parseDetailedComponent(found.file, found.name, found.selector, found.standalone);
+            const rel = path.relative(root, detailed.file);
+            const inputs = (detailed.inputs || []).map((i) => `  - ${i.alias || i.name}${i.required ? '' : '?'}: ${i.type || 'any'}${i.defaultValue ? ` = ${i.defaultValue}` : ''}${i.description ? ` // ${i.description}` : ''}`).join('\n') || '  (nenhum)';
+            const outputs = (detailed.outputs || []).map((o) => `  - ${o.alias || o.name}: ${o.type || 'any'}${o.description ? ` // ${o.description}` : ''}`).join('\n') || '  (nenhum)';
+            const usage = buildUsageSnippet(detailed);
             const detail = [
-                `Nome: ${found.name}`,
-                `Selector: ${found.selector ?? "(não definido)"}`,
+                `Nome: ${detailed.name}`,
+                `Selector: ${detailed.selector ?? "(não definido)"}`,
+                `Standalone: ${detailed.standalone === undefined ? '(desconhecido)' : detailed.standalone}`,
                 `Arquivo: ${rel}`,
-            ].join("\n");
+                `Inputs:\n${inputs}`,
+                `Outputs:\n${outputs}`,
+                usage ? `Uso:\n${usage}` : ''
+            ].filter(Boolean).join("\n");
             return { content: [{ type: "text", text: detail }] };
         }
     }
