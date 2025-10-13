@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "Servidor MCP que lista componentes da lib via public-api.ts",
   "type": "module",
-  "main": "index.js",
+  "main": "main.js",
   "bin": {
-    "lib-components": "./build/index.js"
+    "lib-components": "./build/main.js"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
-    "start": "node ./build/index.js"
+    "build": "tsc && node -e \"require('fs').chmodSync('build/main.js', '755')\"",
+    "start": "node ./build/main.js"
   },
   "files": [
     "build"
