@@ -1,5 +1,5 @@
 export function extractClassBody(source, className) {
-    const classRegex = new RegExp(`export\\s+class\\s+${className}\\b[^ {]*{`, 'm');
+    const classRegex = new RegExp(`export\\s+class\\s+${className}\\b[^{]*\\{`, 'm');
     const m = classRegex.exec(source);
     if (!m)
         return null;

@@ -1,7 +1,7 @@
 import { ComponentInfo } from './types.js';
 
 export function extractClassBody(source: string, className: string): { body: string; start: number } | null {
-  const classRegex = new RegExp(`export\\s+class\\s+${className}\\b[^ {]*{`, 'm');
+  const classRegex = new RegExp(`export\\s+class\\s+${className}\\b[^{]*\\{`, 'm');
   const m = classRegex.exec(source);
   if (!m) return null;
   const startIdx = (m.index || 0) + (m[0]?.length || 0);
