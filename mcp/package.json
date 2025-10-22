@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Servidor MCP que lista componentes da lib via public-api.ts",
   "type": "module",
-  "main": "main.js",
+  "main": "./build/main.js",
   "bin": {
     "lib-components": "./build/main.js"
   },

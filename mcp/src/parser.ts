@@ -39,10 +39,12 @@ export function extractLeadingComment(block: string, decoratorIndex: number): st
 }
 
 export function parsePropertyLine(line: string): { name?: string; type?: string; required?: boolean; defaultValue?: string } {
-  const m = /([A-Za-z_][\w]*)\s*(\?)?\s*:\s*([^=;]+)(?:=\s*([^;]+))?/.exec(line);
+  // Suporta: nome, opcional ? ou !, opcional : tipo, opcional = valor
+  const m = /([A-Za-z_]\w*)\s*([!?])?\s*(?::\s*([^=;]+))?\s*(?:=\s*([^;]+))?/.exec(line);
   if (!m) return {};
   const name = m[1];
-  const required = !Boolean(m[2]);
+  const optionalOrDefinite = m[2];
+  const required = optionalOrDefinite === '?' ? false : true;
   const type = cleanWhitespace(m[3]);
   const defaultValue = cleanWhitespace(m[4]);
   return { name, type, required, defaultValue };
