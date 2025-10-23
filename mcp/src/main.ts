@@ -13,10 +13,10 @@ const server = new McpServer({ name: "lib-components", version: "1.0.0" });
 server.tool(
   "list-components",
   "Lista todos os componentes Angular da biblioteca. Use quando o usuário perguntar: 'quais componentes', 'liste componentes', 'mostre componentes', 'componentes disponíveis'",
-  { libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)") },
-  async ({ libraryName }) => {
+  { libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)"), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") },
+  async ({ libraryName, entryPoint }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
-    const files = await listPotentialComponentFiles(import.meta.url, libraryName);
+    const files = await listPotentialComponentFiles(import.meta.url, libraryName, entryPoint);
     const allInfosArrays = await Promise.all(files.map(extractComponentInfo));
     const infos = allInfosArrays.flat();
     if (infos.length === 0) {
@@ -37,10 +37,10 @@ server.tool(
 server.tool(
   "get-component",
   "Obtém detalhes completos de um componente (inputs, outputs, selector, uso). Use quando o usuário perguntar sobre um componente específico, seus inputs/outputs, como usar, propriedades, eventos",
-  { name: z.string().min(1).describe("Nome da classe do componente, ex.: ButtonComponent"), libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)") },
-  async ({ name, libraryName }) => {
+  { name: z.string().min(1).describe("Nome da classe do componente, ex.: ButtonComponent"), libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)"), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") },
+  async ({ name, libraryName, entryPoint }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
-    const files = await listPotentialComponentFiles(import.meta.url, libraryName);
+    const files = await listPotentialComponentFiles(import.meta.url, libraryName, entryPoint);
     for (const f of files) {
       const infos = await extractComponentInfo(f);
       const found = infos.find((i) => i.name === name);

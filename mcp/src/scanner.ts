@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { ComponentInfo } from './types.js';
 import { collectExportChain } from './exports.js';
-import { readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory, discoverLibraries } from './utils.js';
+import { readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory, discoverLibraries, getLibraryEntryPoints } from './utils.js';
 
-export async function listPotentialComponentFiles(importMetaUrl: string, libraryName?: string): Promise<string[]> {
+export async function listPotentialComponentFiles(importMetaUrl: string, libraryName?: string, entryPointName?: string): Promise<string[]> {
   const WORKSPACE_ROOT = await resolveWorkspaceRoot(importMetaUrl);
   const discovered = await discoverLibraries(importMetaUrl);
   let targetLib = discovered;
@@ -12,14 +12,20 @@ export async function listPotentialComponentFiles(importMetaUrl: string, library
   if (targetLib.length === 0 && discovered.length > 0) targetLib = discovered.slice(0, 1); // fallback: primeira
   const results: string[] = [];
   for (const lib of targetLib) {
-    const chain = await collectExportChain(lib.publicApi, readFileIfExists);
-    if (chain.length > 0) {
-      results.push(...chain);
-      continue;
+    const entryPoints = await getLibraryEntryPoints(lib);
+    const targetEps = entryPointName
+      ? entryPoints.filter(e => e.name === entryPointName || e.path.endsWith(entryPointName))
+      : entryPoints;
+    for (const ep of targetEps) {
+      const chain = await collectExportChain(ep.entryFile, readFileIfExists);
+      if (chain.length > 0) {
+        results.push(...chain);
+        continue;
+      }
+      const componentsDir = path.resolve(ep.path, 'src','lib','components');
+      const walked = await walkComponents(componentsDir);
+      results.push(...walked);
     }
-    const componentsDir = path.resolve(lib.root, 'src','lib','components');
-    const walked = await walkComponents(componentsDir);
-    results.push(...walked);
   }
   return Array.from(new Set(results));
 }
