@@ -1,14 +1,22 @@
 import path from 'node:path';
 import { ComponentInfo } from './types.js';
-import { extractClassBody, extractLeadingComment, parsePropertyLine, parseEventEmitterType, buildUsageSnippet } from './parser.js';
+import { extractClassBody, extractLeadingComment, parsePropertyLine, parseEventEmitterType, buildUsageSnippet, parseSignalInput, parseSignalOutput } from './parser.js';
 import { readFileIfExists } from './utils.js';
+import { extractImports, enrichTypeInfo } from './import-resolver.js';
 
 export async function parseDetailedComponent(filePath: string, className: string, selector?: string, standalone?: boolean): Promise<ComponentInfo> {
   const source = (await readFileIfExists(filePath)) || '';
   const classBlock = extractClassBody(source, className);
   const result: ComponentInfo = { name: className, file: filePath, selector, standalone, inputs: [], outputs: [] };
   if (!classBlock) return result;
+  
+  // Extrai imports para resolução de tipos
+  const imports = extractImports(source);
+  result.imports = imports;
+  
   const block = classBlock.body;
+  
+  // 1. Parseia decorator-based @Input()
   const inputRegex = /@Input(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
   let m: RegExpExecArray | null;
   while ((m = inputRegex.exec(block)) !== null) {
@@ -21,8 +29,42 @@ export async function parseDetailedComponent(filePath: string, className: string
     if (!name) continue;
     const alias = aliasRaw ? aliasRaw.replace(/^['\"]|['\"]$/g, '') : undefined;
     const description = extractLeadingComment(block, m.index) || undefined;
-    result.inputs!.push({ name, alias, type, required, defaultValue, description });
+    const resolvedType = await enrichTypeInfo(filePath, type, imports);
+    result.inputs!.push({ 
+      name, 
+      alias, 
+      type, 
+      required, 
+      defaultValue, 
+      description, 
+      kind: 'decorator',
+      resolvedType: resolvedType !== type ? resolvedType : undefined 
+    });
   }
+  
+  // 2. Parseia signal inputs (Angular 17+)
+  const signalInputLines = block.split('\n');
+  for (let i = 0; i < signalInputLines.length; i++) {
+    const line = signalInputLines[i];
+    if (line.includes('= input')) {
+      const parsed = parseSignalInput(line);
+      if (parsed.name) {
+        const description = i > 0 ? extractLeadingComment(signalInputLines.slice(Math.max(0, i - 3), i).join('\n'), 0) : undefined;
+        const resolvedType = await enrichTypeInfo(filePath, parsed.type, imports);
+        result.inputs!.push({
+          name: parsed.name,
+          type: parsed.type,
+          required: parsed.required,
+          defaultValue: parsed.defaultValue,
+          description,
+          kind: 'signal',
+          resolvedType: resolvedType !== parsed.type ? resolvedType : undefined
+        });
+      }
+    }
+  }
+  
+  // 3. Parseia decorator-based @Output()
   const outputRegex = /@Output(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
   while ((m = outputRegex.exec(block)) !== null) {
     const aliasRaw = m[1];
@@ -35,8 +77,36 @@ export async function parseDetailedComponent(filePath: string, className: string
     const alias = aliasRaw ? aliasRaw.replace(/^['\"]|['\"]$/g, '') : undefined;
     const eventType = parseEventEmitterType(type);
     const description = extractLeadingComment(block, m.index) || undefined;
-    result.outputs!.push({ name, alias, type: eventType || type, description });
+    const resolvedType = await enrichTypeInfo(filePath, eventType || type, imports);
+    result.outputs!.push({ 
+      name, 
+      alias, 
+      type: eventType || type, 
+      description, 
+      kind: 'decorator',
+      resolvedType: resolvedType !== (eventType || type) ? resolvedType : undefined 
+    });
   }
+  
+  // 4. Parseia signal outputs (Angular 17+)
+  for (let i = 0; i < signalInputLines.length; i++) {
+    const line = signalInputLines[i];
+    if (line.includes('= output')) {
+      const parsed = parseSignalOutput(line);
+      if (parsed.name) {
+        const description = i > 0 ? extractLeadingComment(signalInputLines.slice(Math.max(0, i - 3), i).join('\n'), 0) : undefined;
+        const resolvedType = await enrichTypeInfo(filePath, parsed.type, imports);
+        result.outputs!.push({
+          name: parsed.name,
+          type: parsed.type,
+          description,
+          kind: 'signal',
+          resolvedType: resolvedType !== parsed.type ? resolvedType : undefined
+        });
+      }
+    }
+  }
+  
   return result;
 }
 

@@ -1,14 +1,34 @@
 import path from 'node:path';
 import { collectExportChain } from './exports.js';
-import { PUBLIC_API_RELATIVE, readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory } from './utils.js';
-export async function listPotentialComponentFiles(importMetaUrl) {
+import { readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory, discoverLibraries, getLibraryEntryPoints } from './utils.js';
+export async function listPotentialComponentFiles(importMetaUrl, libraryName, entryPointName) {
     const WORKSPACE_ROOT = await resolveWorkspaceRoot(importMetaUrl);
-    const publicApiPath = path.resolve(WORKSPACE_ROOT, PUBLIC_API_RELATIVE);
-    const chain = await collectExportChain(publicApiPath, readFileIfExists);
-    if (chain.length > 0)
-        return chain;
-    const componentsDir = path.resolve(WORKSPACE_ROOT, 'projects', 'my-lib', 'src', 'lib', 'components');
-    return await walkComponents(componentsDir);
+    const discovered = await discoverLibraries(importMetaUrl);
+    let targetLib = discovered;
+    if (libraryName)
+        targetLib = discovered.filter((l) => l.name === libraryName);
+    if (targetLib.length === 0 && libraryName)
+        return []; // lib não encontrada
+    if (targetLib.length === 0 && discovered.length > 0)
+        targetLib = discovered.slice(0, 1); // fallback: primeira
+    const results = [];
+    for (const lib of targetLib) {
+        const entryPoints = await getLibraryEntryPoints(lib);
+        const targetEps = entryPointName
+            ? entryPoints.filter(e => e.name === entryPointName || e.path.endsWith(entryPointName))
+            : entryPoints;
+        for (const ep of targetEps) {
+            const chain = await collectExportChain(ep.entryFile, readFileIfExists);
+            if (chain.length > 0) {
+                results.push(...chain);
+                continue;
+            }
+            const componentsDir = path.resolve(ep.path, 'src', 'lib', 'components');
+            const walked = await walkComponents(componentsDir);
+            results.push(...walked);
+        }
+    }
+    return Array.from(new Set(results));
 }
 async function walkComponents(dir, acc = []) {
     const entries = await readdirSafe(dir);

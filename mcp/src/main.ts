@@ -47,8 +47,20 @@ server.tool(
       if (found) {
         const detailed = await parseDetailedComponent(found.file, found.name, found.selector, found.standalone);
         const rel = path.relative(root, detailed.file);
-    const inputs = (detailed.inputs || []).map((i: any) => `  - ${i.alias || i.name}${i.required ? '' : '?'}: ${i.type || 'any'}${i.defaultValue ? ` = ${i.defaultValue}` : ''}${i.description ? ` // ${i.description}` : ''}`).join('\n') || '  (nenhum)';
-    const outputs = (detailed.outputs || []).map((o: any) => `  - ${o.alias || o.name}: ${o.type || 'any'}${o.description ? ` // ${o.description}` : ''}`).join('\n') || '  (nenhum)';
+    const inputs = (detailed.inputs || []).map((i: any) => {
+      const kindLabel = i.kind === 'signal' ? '🔵 signal' : '🟢 decorator';
+      const typeInfo = i.resolvedType || i.type || 'any';
+      const requiredMark = i.required ? '' : '?';
+      const defaultVal = i.defaultValue ? ` = ${i.defaultValue}` : '';
+      const desc = i.description ? ` // ${i.description}` : '';
+      return `  - ${i.alias || i.name}${requiredMark}: ${typeInfo}${defaultVal} [${kindLabel}]${desc}`;
+    }).join('\n') || '  (nenhum)';
+    const outputs = (detailed.outputs || []).map((o: any) => {
+      const kindLabel = o.kind === 'signal' ? '🔵 signal' : '🟢 decorator';
+      const typeInfo = o.resolvedType || o.type || 'any';
+      const desc = o.description ? ` // ${o.description}` : '';
+      return `  - ${o.alias || o.name}: ${typeInfo} [${kindLabel}]${desc}`;
+    }).join('\n') || '  (nenhum)';
         const usage = buildUsageSnippet(detailed);
         const detail = [
           `Nome: ${detailed.name}`,
