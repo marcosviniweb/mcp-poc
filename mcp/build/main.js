@@ -103,10 +103,17 @@ server.tool("get-library-info", "Obtém informações da biblioteca (versão, de
 });
 server.tool("find-library-by-name", "Busca biblioteca por nome e retorna versão, dependências. Use quando perguntar sobre biblioteca específica: 'versão da lib X', 'info sobre X', 'dependências de X'", { libraryName: z.string().min(1).describe("Nome da biblioteca (ex.: my-lib)") }, async ({ libraryName }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
-    const pkgPath = path.resolve(root, "projects", libraryName, "package.json");
+    const libs = await discoverLibraries(import.meta.url);
+    // Busca a biblioteca pelo nome
+    const lib = libs.find(l => l.name === libraryName);
+    if (!lib) {
+        const available = libs.map(l => `- ${l.name}`).join('\n') || '(nenhuma encontrada)';
+        return { content: [{ type: "text", text: `Biblioteca '${libraryName}' não encontrada.\nBibliotecas disponíveis:\n${available}` }] };
+    }
+    const pkgPath = path.resolve(lib.root, "package.json");
     const content = await readFileIfExists(pkgPath);
     if (!content) {
-        return { content: [{ type: "text", text: `Biblioteca '${libraryName}' não encontrada em projects/${libraryName}/package.json` }] };
+        return { content: [{ type: "text", text: `package.json não encontrado para a biblioteca '${libraryName}' em ${lib.root}` }] };
     }
     try {
         const pkg = JSON.parse(content);
@@ -114,6 +121,7 @@ server.tool("find-library-by-name", "Busca biblioteca por nome e retorna versão
             `Nome: ${pkg.name || '(não definido)'}`,
             `Versão: ${pkg.version || '(não definido)'}`,
             `Descrição: ${pkg.description || '(não definido)'}`,
+            `Caminho: ${lib.root}`,
             `Dependências:`,
             pkg.dependencies ? Object.entries(pkg.dependencies).map(([k, v]) => `  - ${k}: ${v}`).join('\n') : '  (nenhuma)',
             `Peer Dependencies:`,

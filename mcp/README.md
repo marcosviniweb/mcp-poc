@@ -117,19 +117,35 @@ export MCP_WORKSPACE_ROOT=/path/to/workspace
 
 ### Estrutura de Projeto Suportada
 
+✨ **Suporta QUALQUER estrutura de projeto!** Não apenas `projects/`.
+
+O MCP server detecta automaticamente bibliotecas em:
+- 📁 `projects/` - Angular CLI padrão
+- 📁 `libs/` - Nx workspaces
+- 📁 `packages/` - Monorepos (Lerna, pnpm, yarn)
+- 📁 `modules/` - Estruturas customizadas
+- 📁 Qualquer pasta (busca recursiva)
+
+**Exemplos de estruturas suportadas:**
+
+```bash
+# Angular CLI padrão
+workspace/projects/my-lib/
+
+# Nx workspace
+workspace/libs/my-lib/
+
+# Monorepo
+workspace/packages/my-lib/
+
+# Biblioteca na raiz
+workspace/my-lib/
+
+# Estrutura customizada
+workspace/custom/nested/my-lib/
 ```
-workspace/
-├── angular.json          # Angular CLI workspace
-├── workspace.json        # Nx workspace
-└── projects/
-    └── my-lib/
-        ├── ng-package.json
-        ├── package.json
-        └── src/
-            ├── public-api.ts
-            └── lib/
-                └── components/
-```
+
+Para mais detalhes, veja [GENERIC-STRUCTURE-SUPPORT.md](./GENERIC-STRUCTURE-SUPPORT.md).
 
 ## 📚 Exemplos
 

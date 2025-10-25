@@ -99,7 +99,23 @@ async function discoverFromAngularJson(workspaceRoot: string): Promise<Discovere
       // Angular >=15 normalmente traz projectType
       const isLib = (proj.projectType === 'library') || true; // assume lib se não informado
       if (!isLib) continue;
-      const root = path.resolve(workspaceRoot, proj.root || path.join('projects', name));
+      
+      // Se proj.root existe, usa ele; senão, tenta encontrar a biblioteca
+      let root: string = path.resolve(workspaceRoot, name); // inicializa com fallback
+      if (proj.root) {
+        root = path.resolve(workspaceRoot, proj.root);
+      } else {
+        // Busca em pastas comuns
+        const commonFolders = ['projects', 'libs', 'packages', 'modules'];
+        for (const folder of commonFolders) {
+          const candidate = path.resolve(workspaceRoot, folder, name);
+          if (await statIsDirectory(candidate)) {
+            root = candidate;
+            break;
+          }
+        }
+      }
+      
       const sourceRoot = proj.sourceRoot ? path.resolve(workspaceRoot, proj.sourceRoot) : path.resolve(root, 'src');
       const publicApi = path.resolve(sourceRoot, 'public-api.ts');
       libs.push({ name, root, sourceRoot, publicApi });
@@ -110,21 +126,74 @@ async function discoverFromAngularJson(workspaceRoot: string): Promise<Discovere
   }
 }
 
-async function findPublicApiFallback(workspaceRoot: string): Promise<DiscoveredLibrary[]> {
-  // Caminha recursivamente procurando por public-api.ts dentro de projects/*/src
-  const projectsDir = path.resolve(workspaceRoot, 'projects');
+/**
+ * Busca recursivamente por bibliotecas Angular em todo o workspace
+ * Suporta qualquer estrutura: projects/, libs/, packages/, ou raiz
+ */
+async function findLibrariesRecursively(
+  workspaceRoot: string,
+  maxDepth: number = 4
+): Promise<DiscoveredLibrary[]> {
   const result: DiscoveredLibrary[] = [];
-  const entries = await readdirSafe(projectsDir);
-  for (const name of entries) {
-    const projRoot = path.resolve(projectsDir, name);
-    if (!(await statIsDirectory(projRoot))) continue;
-    const sourceRoot = path.resolve(projRoot, 'src');
-    const publicApi = path.resolve(sourceRoot, 'public-api.ts');
+  const visited = new Set<string>();
+  
+  // Pastas comuns de bibliotecas para priorizar
+  const commonLibFolders = ['projects', 'libs', 'packages', 'modules', 'libraries'];
+  
+  async function search(dir: string, depth: number): Promise<void> {
+    if (depth > maxDepth || visited.has(dir)) return;
+    visited.add(dir);
+    
+    // Ignora node_modules e outras pastas desnecessárias
+    const basename = path.basename(dir);
+    if (basename === 'node_modules' || basename === 'dist' || basename === '.git' || basename.startsWith('.')) {
+      return;
+    }
+    
+    // Verifica se é uma biblioteca (tem public-api.ts ou ng-package.json)
+    const srcDir = path.resolve(dir, 'src');
+    const publicApi = path.resolve(srcDir, 'public-api.ts');
+    const ngPackage = path.resolve(dir, 'ng-package.json');
+    
     if (await readFileIfExists(publicApi)) {
-      result.push({ name, root: projRoot, sourceRoot, publicApi });
+      const name = path.basename(dir);
+      result.push({ name, root: dir, sourceRoot: srcDir, publicApi });
+      return; // Não continua procurando dentro de uma lib encontrada
+    } else if (await readFileIfExists(ngPackage)) {
+      // Tem ng-package.json mas sem public-api.ts na estrutura padrão
+      const name = path.basename(dir);
+      result.push({ name, root: dir, sourceRoot: srcDir, publicApi });
+      return;
+    }
+    
+    // Continua buscando recursivamente
+    const entries = await readdirSafe(dir);
+    for (const entry of entries) {
+      const fullPath = path.resolve(dir, entry);
+      if (await statIsDirectory(fullPath)) {
+        await search(fullPath, depth + 1);
+      }
     }
   }
+  
+  // Primeiro busca nas pastas comuns (mais rápido)
+  for (const folder of commonLibFolders) {
+    const folderPath = path.resolve(workspaceRoot, folder);
+    if (await statIsDirectory(folderPath)) {
+      await search(folderPath, 1);
+    }
+  }
+  
+  // Se não encontrou nada, busca a partir da raiz (mais lento)
+  if (result.length === 0) {
+    await search(workspaceRoot, 0);
+  }
+  
   return result;
+}
+
+async function findPublicApiFallback(workspaceRoot: string): Promise<DiscoveredLibrary[]> {
+  return await findLibrariesRecursively(workspaceRoot);
 }
 
 export async function discoverLibraries(importMetaUrl: string): Promise<DiscoveredLibrary[]> {
@@ -141,27 +210,54 @@ export async function discoverLibraries(importMetaUrl: string): Promise<Discover
 async function discoverFromNxWorkspace(workspaceRoot: string): Promise<DiscoveredLibrary[]> {
   const workspaceCfg = await readJsonIfExists<any>(path.resolve(workspaceRoot, 'workspace.json'));
   const libs: DiscoveredLibrary[] = [];
+  
   if (workspaceCfg && workspaceCfg.projects) {
     for (const [name, proj] of Object.entries<any>(workspaceCfg.projects)) {
-      const projRoot = typeof proj === 'string' ? path.resolve(workspaceRoot, proj) : path.resolve(workspaceRoot, proj.root || path.join('projects', name));
-      const sourceRoot = typeof proj === 'string' ? path.resolve(projRoot, 'src') : (proj.sourceRoot ? path.resolve(workspaceRoot, proj.sourceRoot) : path.resolve(projRoot, 'src'));
+      let projRoot: string = path.resolve(workspaceRoot, name); // inicializa com fallback
+      
+      if (typeof proj === 'string') {
+        projRoot = path.resolve(workspaceRoot, proj);
+      } else if (proj.root) {
+        projRoot = path.resolve(workspaceRoot, proj.root);
+      } else {
+        // Busca em pastas comuns
+        const commonFolders = ['projects', 'libs', 'packages', 'modules'];
+        for (const folder of commonFolders) {
+          const candidate = path.resolve(workspaceRoot, folder, name);
+          if (await statIsDirectory(candidate)) {
+            projRoot = candidate;
+            break;
+          }
+        }
+      }
+      
+      const sourceRoot = typeof proj === 'string' 
+        ? path.resolve(projRoot, 'src') 
+        : (proj.sourceRoot ? path.resolve(workspaceRoot, proj.sourceRoot) : path.resolve(projRoot, 'src'));
       const publicApi = path.resolve(sourceRoot, 'public-api.ts');
       libs.push({ name, root: projRoot, sourceRoot, publicApi });
     }
     return libs;
   }
-  // project.json por projeto
-  const projectsDir = path.resolve(workspaceRoot, 'projects');
-  const entries = await readdirSafe(projectsDir);
-  for (const name of entries) {
-    const projRoot = path.resolve(projectsDir, name);
-    if (!(await statIsDirectory(projRoot))) continue;
-    const projectJson = await readJsonIfExists<any>(path.resolve(projRoot, 'project.json'));
-    if (!projectJson) continue;
-    const sourceRoot = projectJson.sourceRoot ? path.resolve(workspaceRoot, projectJson.sourceRoot) : path.resolve(projRoot, 'src');
-    const publicApi = path.resolve(sourceRoot, 'public-api.ts');
-    libs.push({ name, root: projRoot, sourceRoot, publicApi });
+  
+  // project.json por projeto - busca em múltiplas pastas comuns
+  const commonFolders = ['projects', 'libs', 'packages', 'modules'];
+  for (const folder of commonFolders) {
+    const folderPath = path.resolve(workspaceRoot, folder);
+    if (!(await statIsDirectory(folderPath))) continue;
+    
+    const entries = await readdirSafe(folderPath);
+    for (const name of entries) {
+      const projRoot = path.resolve(folderPath, name);
+      if (!(await statIsDirectory(projRoot))) continue;
+      const projectJson = await readJsonIfExists<any>(path.resolve(projRoot, 'project.json'));
+      if (!projectJson) continue;
+      const sourceRoot = projectJson.sourceRoot ? path.resolve(workspaceRoot, projectJson.sourceRoot) : path.resolve(projRoot, 'src');
+      const publicApi = path.resolve(sourceRoot, 'public-api.ts');
+      libs.push({ name, root: projRoot, sourceRoot, publicApi });
+    }
   }
+  
   return libs;
 }
 

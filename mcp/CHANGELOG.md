@@ -1,5 +1,71 @@
 # Changelog
 
+## [1.2.0] - 2024-10-25
+
+### 🎯 Suporte a Estruturas de Projeto Genéricas
+
+#### ✨ Novas Funcionalidades
+
+- **Busca Genérica de Bibliotecas**: O MCP server agora detecta bibliotecas em **qualquer estrutura de pastas**
+  - ✅ `projects/` - Angular CLI padrão
+  - ✅ `libs/` - Nx workspaces
+  - ✅ `packages/` - Monorepos (Lerna, pnpm, yarn, npm)
+  - ✅ `modules/`, `libraries/` - Estruturas customizadas
+  - ✅ Raiz do workspace - Bibliotecas standalone
+  - ✅ Estruturas aninhadas - Busca recursiva automática
+
+#### 🔧 Melhorias Implementadas
+
+1. **Busca Recursiva Inteligente**
+   - Busca primeiro em pastas comuns (performance)
+   - Fallback para busca recursiva em todo workspace
+   - Limite de profundidade configurável (4 níveis)
+   - Ignora automaticamente `node_modules/`, `dist/`, `.git/`
+
+2. **Descoberta Aprimorada**
+   - `discoverFromAngularJson()`: Busca em múltiplas pastas quando `proj.root` não definido
+   - `discoverFromNxWorkspace()`: Suporta múltiplas convenções de pastas
+   - `findLibrariesRecursively()`: Nova função de busca genérica
+   - `find-library-by-name`: Usa descoberta automática em vez de path hardcoded
+
+3. **Performance**
+   - Cache de diretórios visitados
+   - Busca prioritária em pastas comuns
+   - Para busca ao encontrar biblioteca (não continua dentro)
+
+#### 🚫 Removido
+
+- ❌ Hardcoded `projects/` em múltiplos lugares
+- ❌ Dependência de estrutura específica
+
+#### 📝 Arquivos Modificados
+
+1. **mcp/src/utils.ts**
+   - Refatorada `discoverFromAngularJson()` - busca genérica
+   - Refatorada `discoverFromNxWorkspace()` - suporte a múltiplas pastas
+   - Nova função `findLibrariesRecursively()` - busca recursiva
+   - Atualizada `findPublicApiFallback()` - usa busca recursiva
+
+2. **mcp/src/main.ts**
+   - Refatorado `find-library-by-name` - usa `discoverLibraries()` em vez de path hardcoded
+   - Adicionado campo `Caminho` na resposta
+
+3. **mcp/GENERIC-STRUCTURE-SUPPORT.md** - Nova documentação completa
+
+4. **mcp/README.md** - Atualizado com informações de suporte genérico
+
+#### 🧪 Testes
+
+- ✅ Estrutura `projects/` continua funcionando
+- ✅ Compatível com workspaces existentes
+- ✅ Sem breaking changes
+
+#### 📚 Documentação
+
+- [GENERIC-STRUCTURE-SUPPORT.md](./GENERIC-STRUCTURE-SUPPORT.md) - Guia completo de estruturas suportadas
+
+---
+
 ## [1.1.0] - 2024-10-24
 
 ### ✨ Novas Funcionalidades
