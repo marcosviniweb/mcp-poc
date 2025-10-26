@@ -1,0 +1,175 @@
+{
+  "description": "Exemplos de configuração do MCP Server lib-components",
+  "examples": {
+    "1-single-library": {
+      "title": "Uma única biblioteca do node_modules",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib"
+            }
+          }
+        }
+      }
+    },
+    "2-multiple-libraries-env": {
+      "title": "Múltiplas bibliotecas via variável de ambiente (separadas por ;)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib;C:\\projeto\\node_modules\\@company\\forms-lib;C:\\repos-locais\\custom-lib"
+            }
+          }
+        }
+      }
+    },
+    "3-multiple-libraries-args": {
+      "title": "Múltiplas bibliotecas via argumentos CLI",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": [
+              "C:\\path\\to\\mcp\\build\\main.js",
+              "--libs",
+              "C:\\projeto\\node_modules\\@company\\ui-lib",
+              "C:\\projeto\\node_modules\\@company\\forms-lib",
+              "C:\\repos-locais\\custom-lib"
+            ]
+          }
+        }
+      }
+    },
+    "4-workspace-plus-external": {
+      "title": "Workspace completo + bibliotecas externas",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "MCP_WORKSPACE_ROOT": "C:\\workspace-angular",
+              "LIB_COMPONENTS_PATHS": "C:\\outro-projeto\\node_modules\\@external\\lib"
+            }
+          }
+        }
+      }
+    },
+    "5-dist-folder": {
+      "title": "Biblioteca compilada (pasta dist/)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "C:\\libs\\my-lib\\dist"
+            }
+          }
+        }
+      }
+    },
+    "6-scoped-packages": {
+      "title": "Pacotes com escopo (@scope/package)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@angular\\material;C:\\projeto\\node_modules\\@company\\design-system"
+            }
+          }
+        }
+      }
+    },
+    "7-mixed-sources": {
+      "title": "Fontes mistas: node_modules + repositórios + dist",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": [
+              "C:\\path\\to\\mcp\\build\\main.js",
+              "--libs",
+              "C:\\projeto\\node_modules\\@company\\ui-lib",
+              "C:\\repos\\my-lib-source",
+              "C:\\builds\\another-lib\\dist"
+            ]
+          }
+        }
+      }
+    },
+    "8-unix-paths": {
+      "title": "Exemplo para Linux/Mac (separador :)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["/path/to/mcp/build/main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "/home/user/projeto/node_modules/@company/ui-lib:/home/user/repos/custom-lib"
+            }
+          }
+        }
+      }
+    },
+    "9-nx-workspace": {
+      "title": "Nx Workspace (libs folder)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "env": {
+              "LIB_COMPONENTS_PATHS": "C:\\nx-workspace\\libs\\ui;C:\\nx-workspace\\libs\\data-access"
+            }
+          }
+        }
+      }
+    },
+    "10-monorepo": {
+      "title": "Monorepo (packages folder)",
+      "config": {
+        "mcpServers": {
+          "lib-components": {
+            "command": "node",
+            "args": [
+              "C:\\path\\to\\mcp\\build\\main.js",
+              "--libs",
+              "C:\\monorepo\\packages\\lib-a",
+              "C:\\monorepo\\packages\\lib-b",
+              "C:\\monorepo\\packages\\lib-c"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "notes": {
+    "separators": {
+      "windows": "Use ; (ponto e vírgula) para separar múltiplos paths",
+      "unix": "Use : (dois pontos) para separar múltiplos paths"
+    },
+    "priority": "Ordem de prioridade: args CLI > env var > workspace atual",
+    "formats": [
+      "Workspace completo (com angular.json ou workspace.json)",
+      "Biblioteca específica (com package.json e src/)",
+      "Pasta dist/ (biblioteca compilada)",
+      "Pasta node_modules/@scope/package"
+    ],
+    "tips": [
+      "Use caminhos absolutos para evitar problemas",
+      "O MCP detecta automaticamente o tipo de estrutura",
+      "Logs de inicialização mostram as bibliotecas encontradas",
+      "Combine workspace root + paths específicos para máxima flexibilidade"
+    ]
+  }
+}
+

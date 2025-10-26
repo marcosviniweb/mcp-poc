@@ -8,7 +8,7 @@ import { listPotentialComponentFiles, extractComponentInfo } from "./scanner.js"
 import { parseDetailedComponent } from "./docs.js";
 import { buildUsageSnippet } from "./parser.js";
 
-const server = new McpServer({ name: "lib-components", version: "1.0.0" });
+const server = new McpServer({ name: "lib-components", version: "1.3.0" });
 
 server.tool(
   "list-components",
@@ -126,7 +126,6 @@ server.tool(
     const root = await resolveWorkspaceRoot(import.meta.url);
     const libs = await discoverLibraries(import.meta.url);
     
-    // Busca a biblioteca pelo nome
     const lib = libs.find(l => l.name === libraryName);
     if (!lib) {
       const available = libs.map(l => `- ${l.name}`).join('\n') || '(nenhuma encontrada)';
@@ -159,9 +158,34 @@ server.tool(
 );
 
 async function main() {
+  console.error("=".repeat(60));
+  console.error("MCP Server 'lib-components' iniciando...");
+  console.error("=".repeat(60));
+  
+  // Descobre e exibe bibliotecas disponíveis
+  try {
+    const libs = await discoverLibraries(import.meta.url);
+    if (libs.length > 0) {
+      console.error(`\n✓ ${libs.length} biblioteca(s) disponível(is):`);
+      libs.forEach(lib => {
+        console.error(`  • ${lib.name}`);
+        console.error(`    Root: ${lib.root}`);
+        console.error(`    Entry: ${path.basename(lib.publicApi)}`);
+      });
+    } else {
+      console.error("\n⚠ Nenhuma biblioteca encontrada!");
+      console.error("  Verifique a configuração de paths ou o workspace.");
+    }
+  } catch (err) {
+    console.error("\n⚠ Erro ao descobrir bibliotecas:", err);
+  }
+  
+  console.error("\n" + "=".repeat(60));
+  console.error("Servidor pronto. Aguardando requisições...");
+  console.error("=".repeat(60) + "\n");
+  
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("MCP Server 'lib-components' rodando via stdio");
 }
 
 main().catch((err) => {

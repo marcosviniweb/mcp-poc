@@ -182,15 +182,185 @@ async function findLibrariesRecursively(workspaceRoot, maxDepth = 4) {
 async function findPublicApiFallback(workspaceRoot) {
     return await findLibrariesRecursively(workspaceRoot);
 }
+/**
+ * Parseia múltiplos caminhos de bibliotecas separados por ; (Windows) ou : (Unix)
+ * Suporta tanto variável de ambiente quanto argumentos CLI
+ */
+export function parseLibraryPaths() {
+    const paths = [];
+    // 1. Verifica argumentos CLI: --libs path1 path2 path3
+    const libsArgIndex = process.argv.indexOf('--libs');
+    if (libsArgIndex !== -1) {
+        // Coleta todos os argumentos após --libs até encontrar outro flag ou fim
+        for (let i = libsArgIndex + 1; i < process.argv.length; i++) {
+            const arg = process.argv[i];
+            if (arg.startsWith('--'))
+                break;
+            // Se contém separador, divide
+            if (arg.includes(';') || arg.includes(':')) {
+                paths.push(...arg.split(/[;:]/));
+            }
+            else {
+                paths.push(arg);
+            }
+        }
+    }
+    // 2. Verifica variável de ambiente
+    const envPaths = process.env.LIB_COMPONENTS_PATHS;
+    if (envPaths) {
+        // Suporta tanto ; quanto : como separador
+        paths.push(...envPaths.split(/[;:]/));
+    }
+    // Remove paths vazios e normaliza
+    return paths
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+        .map(p => path.resolve(p));
+}
+/**
+ * Descobre bibliotecas a partir de um path específico
+ * Detecta automaticamente se é: workspace completo, lib específica, ou dist/
+ */
+async function discoverLibraryFromPath(libPath) {
+    // Verifica se existe
+    if (!await statIsDirectory(libPath)) {
+        console.error(`[MCP] Caminho não encontrado ou não é um diretório: ${libPath}`);
+        return [];
+    }
+    // Caso 1: É um workspace completo (tem angular.json ou workspace.json)
+    const angularJson = await readFileIfExists(path.resolve(libPath, 'angular.json'));
+    if (angularJson) {
+        const libs = await discoverFromAngularJson(libPath);
+        if (libs.length > 0)
+            return libs;
+    }
+    const workspaceJson = await readFileIfExists(path.resolve(libPath, 'workspace.json'));
+    if (workspaceJson) {
+        const libs = await discoverFromNxWorkspace(libPath);
+        if (libs.length > 0)
+            return libs;
+    }
+    // Caso 2: É uma biblioteca específica (tem package.json e src/ ou dist/)
+    const packageJson = await readFileIfExists(path.resolve(libPath, 'package.json'));
+    if (packageJson) {
+        try {
+            const pkg = JSON.parse(packageJson);
+            const name = pkg.name || path.basename(libPath);
+            // Verifica src/public-api.ts (código fonte)
+            const srcPublicApi = path.resolve(libPath, 'src', 'public-api.ts');
+            if (await readFileIfExists(srcPublicApi)) {
+                return [{
+                        name,
+                        root: libPath,
+                        sourceRoot: path.resolve(libPath, 'src'),
+                        publicApi: srcPublicApi
+                    }];
+            }
+            // Verifica dist/ (biblioteca compilada) - busca index.d.ts ou public-api.d.ts
+            const distDir = path.resolve(libPath, 'dist');
+            if (await statIsDirectory(distDir)) {
+                // Busca recursivamente por index.d.ts ou public-api.d.ts
+                const dtsFiles = await findDtsEntryPoint(distDir);
+                if (dtsFiles.length > 0) {
+                    return [{
+                            name,
+                            root: libPath,
+                            sourceRoot: distDir,
+                            publicApi: dtsFiles[0]
+                        }];
+                }
+            }
+            // Caso 3: É um node_modules/@scope/lib - busca diretamente por .d.ts
+            const dtsFiles = await findDtsEntryPoint(libPath);
+            if (dtsFiles.length > 0) {
+                return [{
+                        name,
+                        root: libPath,
+                        sourceRoot: libPath,
+                        publicApi: dtsFiles[0]
+                    }];
+            }
+        }
+        catch (err) {
+            console.error(`[MCP] Erro ao processar package.json em ${libPath}:`, err);
+        }
+    }
+    // Caso 4: Busca recursiva (fallback)
+    const libs = await findLibrariesRecursively(libPath, 3);
+    return libs;
+}
+/**
+ * Busca por arquivos .d.ts que servem como entry point (index.d.ts ou public-api.d.ts)
+ */
+async function findDtsEntryPoint(dir, maxDepth = 2) {
+    const results = [];
+    async function search(currentDir, depth) {
+        if (depth > maxDepth)
+            return;
+        const entries = await readdirSafe(currentDir);
+        // Prioriza index.d.ts e public-api.d.ts na raiz
+        for (const name of ['index.d.ts', 'public-api.d.ts', 'public_api.d.ts']) {
+            const candidate = path.resolve(currentDir, name);
+            if (await readFileIfExists(candidate)) {
+                results.push(candidate);
+                return;
+            }
+        }
+        // Busca em subdiretórios
+        for (const entry of entries) {
+            const fullPath = path.resolve(currentDir, entry);
+            if (await statIsDirectory(fullPath)) {
+                const basename = path.basename(fullPath);
+                // Ignora pastas desnecessárias
+                if (basename !== 'node_modules' && !basename.startsWith('.')) {
+                    await search(fullPath, depth + 1);
+                }
+            }
+        }
+    }
+    await search(dir, 0);
+    return results;
+}
+/**
+ * Descobre bibliotecas de múltiplos paths configurados
+ */
+async function discoverLibrariesFromPaths(paths) {
+    const allLibs = [];
+    for (const libPath of paths) {
+        const libs = await discoverLibraryFromPath(libPath);
+        allLibs.push(...libs);
+    }
+    return allLibs;
+}
 export async function discoverLibraries(importMetaUrl) {
+    // 1. Prioridade: Paths configurados via CLI ou env var
+    const configuredPaths = parseLibraryPaths();
+    if (configuredPaths.length > 0) {
+        console.error(`[MCP] Usando paths configurados: ${configuredPaths.length} path(s)`);
+        configuredPaths.forEach(p => console.error(`  - ${p}`));
+        const libs = await discoverLibrariesFromPaths(configuredPaths);
+        if (libs.length > 0) {
+            console.error(`[MCP] Encontradas ${libs.length} biblioteca(s) nos paths configurados`);
+            return await withNgPackagrEntryFiles('', libs);
+        }
+        console.error(`[MCP] Nenhuma biblioteca encontrada nos paths configurados`);
+    }
+    // 2. Fallback: Workspace atual (comportamento original)
+    console.error(`[MCP] Buscando bibliotecas no workspace atual...`);
     const root = await resolveWorkspaceRoot(importMetaUrl);
+    console.error(`[MCP] Workspace root: ${root}`);
     const fromAngular = await discoverFromAngularJson(root);
-    if (fromAngular.length > 0)
+    if (fromAngular.length > 0) {
+        console.error(`[MCP] Encontradas ${fromAngular.length} biblioteca(s) via angular.json`);
         return await withNgPackagrEntryFiles(root, fromAngular);
+    }
     const fromNx = await discoverFromNxWorkspace(root);
-    if (fromNx.length > 0)
+    if (fromNx.length > 0) {
+        console.error(`[MCP] Encontradas ${fromNx.length} biblioteca(s) via workspace.json`);
         return await withNgPackagrEntryFiles(root, fromNx);
+    }
     const fb = await findPublicApiFallback(root);
+    console.error(`[MCP] Encontradas ${fb.length} biblioteca(s) via busca recursiva`);
     return await withNgPackagrEntryFiles(root, fb);
 }
 // Nx: workspace.json e project.json

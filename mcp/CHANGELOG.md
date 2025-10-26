@@ -1,5 +1,79 @@
 # Changelog
 
+## [1.3.0] - 2024-10-26
+
+### 🎯 Configuração Multi-Path para Análise de Bibliotecas
+
+#### ✨ Novas Funcionalidades
+
+- **Suporte a Múltiplos Caminhos de Bibliotecas**: Configure múltiplas fontes de bibliotecas simultaneamente
+  - ✅ Bibliotecas instaladas no `node_modules` (via npm/Nexus)
+  - ✅ Repositórios Git clonados localmente (código fonte completo)
+  - ✅ Múltiplos workspaces Angular/Nx
+  - ✅ Bibliotecas compiladas (pasta `dist/` com arquivos `.d.ts`)
+  
+- **Configuração Flexível**:
+  - ✅ Via variável de ambiente: `LIB_COMPONENTS_PATHS`
+  - ✅ Via argumentos CLI: `--libs path1 path2 path3`
+  - ✅ Suporte a separadores: `;` (Windows) e `:` (Unix/Mac)
+  - ✅ Ordem de prioridade: CLI > env var > workspace atual
+
+- **Detecção Automática de Estrutura**:
+  - ✅ Workspace completo (angular.json/workspace.json)
+  - ✅ Biblioteca específica (package.json + src/)
+  - ✅ Biblioteca compilada (dist/ com .d.ts)
+  - ✅ Pacotes node_modules com escopo (@scope/package)
+
+- **Suporte a Arquivos .d.ts**:
+  - ✅ Análise de componentes em arquivos de definição TypeScript
+  - ✅ Suporta declarações `export declare class`
+  - ✅ Busca automática por entry points (index.d.ts, public-api.d.ts)
+
+#### 🔧 Melhorias Implementadas
+
+1. **utils.ts**
+   - Nova função `parseLibraryPaths()`: Parseia múltiplos caminhos via CLI ou env var
+   - Nova função `discoverLibraryFromPath()`: Detecta tipo de estrutura automaticamente
+   - Nova função `findDtsEntryPoint()`: Busca arquivos .d.ts como entry points
+   - Nova função `discoverLibrariesFromPaths()`: Descobre libs de múltiplos paths
+   - Refatorada `discoverLibraries()`: Prioriza paths configurados, depois fallback
+   - Logs informativos em cada etapa da descoberta
+
+2. **scanner.ts**
+   - Atualizada `walkComponents()`: Suporta `.component.d.ts` além de `.component.ts`
+   - Melhorada `extractComponentInfo()`: Detecta `export declare class` em arquivos .d.ts
+
+3. **main.ts**
+   - Logs de inicialização melhorados com informações detalhadas
+   - Exibe bibliotecas descobertas ao iniciar
+   - Mensagens formatadas com separadores visuais
+
+4. **Documentação**
+   - README.md: Nova seção "Configuração Multi-Path" com 5 exemplos práticos
+   - Novo arquivo `mcp-config-examples.json`: 10 exemplos de configuração prontos
+   - Documentação de ordem de prioridade e formatos suportados
+   - Exemplos para Windows e Linux/Mac
+
+#### 📝 Arquivos Criados
+
+- **mcp/mcp-config-examples.json**: Arquivo com 10 exemplos de configuração
+
+#### 📝 Arquivos Modificados
+
+- **mcp/src/utils.ts**: +170 linhas (novas funções de multi-path)
+- **mcp/src/scanner.ts**: Suporte a .d.ts
+- **mcp/src/main.ts**: Logs de inicialização melhorados
+- **mcp/README.md**: Nova seção de configuração multi-path
+
+#### 🎯 Casos de Uso Habilitados
+
+Este update permite que projetos usem o MCP para:
+1. Analisar libs instaladas via npm/Nexus no node_modules do projeto
+2. Analisar repositórios Git locais com código fonte completo
+3. Combinar múltiplas fontes de bibliotecas
+4. Trabalhar com libs de diferentes projetos simultaneamente
+5. Usar em ambientes de CI/CD com paths dinâmicos
+
 ## [1.2.0] - 2024-10-25
 
 ### 🎯 Suporte a Estruturas de Projeto Genéricas

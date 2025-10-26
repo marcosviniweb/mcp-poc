@@ -106,13 +106,158 @@ Busca biblioteca específica por nome.
 
 ## 🔧 Configuração
 
-### Variáveis de Ambiente
+### 🎯 Configuração Multi-Path (Recomendado)
+
+**Novidade!** Agora você pode configurar múltiplos caminhos de bibliotecas, permitindo analisar:
+- ✅ Bibliotecas instaladas no `node_modules` (via npm/Nexus)
+- ✅ Repositórios Git clonados localmente
+- ✅ Múltiplos workspaces Angular/Nx
+- ✅ Bibliotecas compiladas (pasta `dist/`)
+
+#### Exemplo 1: Uma Única Biblioteca
+
+```json
+{
+  "mcpServers": {
+    "lib-components": {
+      "command": "node",
+      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib"
+      }
+    }
+  }
+}
+```
+
+#### Exemplo 2: Múltiplas Bibliotecas (Variável de Ambiente)
+
+Use `;` no Windows ou `:` no Linux/Mac para separar múltiplos paths:
+
+```json
+{
+  "mcpServers": {
+    "lib-components": {
+      "command": "node",
+      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib;C:\\projeto\\node_modules\\@company\\forms-lib;C:\\repos-locais\\custom-lib"
+      }
+    }
+  }
+}
+```
+
+#### Exemplo 3: Múltiplas Bibliotecas (Argumentos CLI)
+
+```json
+{
+  "mcpServers": {
+    "lib-components": {
+      "command": "node",
+      "args": [
+        "C:\\path\\to\\mcp\\build\\main.js",
+        "--libs",
+        "C:\\projeto\\node_modules\\@company\\ui-lib",
+        "C:\\projeto\\node_modules\\@company\\forms-lib",
+        "C:\\repos-locais\\custom-lib"
+      ]
+    }
+  }
+}
+```
+
+#### Exemplo 4: Workspace + Bibliotecas Externas
+
+```json
+{
+  "mcpServers": {
+    "lib-components": {
+      "command": "node",
+      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "env": {
+        "MCP_WORKSPACE_ROOT": "C:\\workspace-angular",
+        "LIB_COMPONENTS_PATHS": "C:\\outro-projeto\\node_modules\\@external\\lib"
+      }
+    }
+  }
+}
+```
+
+#### Exemplo 5: Linux/Mac
+
+```json
+{
+  "mcpServers": {
+    "lib-components": {
+      "command": "node",
+      "args": ["/path/to/mcp/build/main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "/home/user/projeto/node_modules/@company/ui-lib:/home/user/repos/custom-lib"
+      }
+    }
+  }
+}
+```
+
+**📁 Mais exemplos:** Veja [mcp-config-examples.json](./mcp-config-examples.json) para 10+ exemplos de configuração.
+
+#### ⚙️ Como Funciona
+
+**Ordem de Prioridade:**
+1. ✅ Argumentos CLI (`--libs`)
+2. ✅ Variável de ambiente (`LIB_COMPONENTS_PATHS`)
+3. ✅ Workspace atual (fallback automático)
+
+**Formatos Suportados:**
+- 📦 **Workspace completo**: Pasta com `angular.json` ou `workspace.json`
+- 📚 **Biblioteca específica**: Pasta com `package.json` e `src/` ou `dist/`
+- 🔨 **Biblioteca compilada**: Pasta `dist/` com arquivos `.d.ts`
+- 📦 **node_modules**: Pacotes instalados via npm/Nexus
+
+**Detecção Automática:**
+O MCP detecta automaticamente o tipo de estrutura e busca componentes nos lugares corretos!
+
+#### 🔍 Verificando a Configuração
+
+Ao iniciar, o MCP exibe logs mostrando:
+- Quantos paths foram configurados
+- Quais bibliotecas foram encontradas
+- Onde cada biblioteca está localizada
+
+```
+============================================================
+MCP Server 'lib-components' iniciando...
+============================================================
+[MCP] Usando paths configurados: 3 path(s)
+  - C:\projeto\node_modules\@company\ui-lib
+  - C:\projeto\node_modules\@company\forms-lib
+  - C:\repos-locais\custom-lib
+[MCP] Encontradas 3 biblioteca(s) nos paths configurados
+
+✓ 3 biblioteca(s) disponível(is):
+  • @company/ui-lib
+    Root: C:\projeto\node_modules\@company\ui-lib
+    Entry: index.d.ts
+  • @company/forms-lib
+    Root: C:\projeto\node_modules\@company\forms-lib
+    Entry: public-api.d.ts
+  • custom-lib
+    Root: C:\repos-locais\custom-lib
+    Entry: public-api.ts
+============================================================
+```
+
+### Variáveis de Ambiente (Legado)
 
 ```bash
 # Workspace root (opcional)
 export LIB_COMPONENTS_WORKSPACE=/path/to/workspace
 # ou
 export MCP_WORKSPACE_ROOT=/path/to/workspace
+
+# Múltiplos paths de bibliotecas (novo!)
+export LIB_COMPONENTS_PATHS="/path/to/lib1:/path/to/lib2"
 ```
 
 ### Estrutura de Projeto Suportada

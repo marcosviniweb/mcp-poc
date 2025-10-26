@@ -8,11 +8,9 @@ export async function parseDetailedComponent(filePath, className, selector, stan
     const result = { name: className, file: filePath, selector, standalone, inputs: [], outputs: [] };
     if (!classBlock)
         return result;
-    // Extrai imports para resolução de tipos
     const imports = extractImports(source);
     result.imports = imports;
     const block = classBlock.body;
-    // 1. Parseia decorator-based @Input()
     const inputRegex = /@Input(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
     let m;
     while ((m = inputRegex.exec(block)) !== null) {
@@ -39,7 +37,6 @@ export async function parseDetailedComponent(filePath, className, selector, stan
             resolvedType: resolvedType !== type ? resolvedType : undefined
         });
     }
-    // 2. Parseia signal inputs (Angular 17+)
     const signalInputLines = block.split('\n');
     for (let i = 0; i < signalInputLines.length; i++) {
         const line = signalInputLines[i];
@@ -60,7 +57,6 @@ export async function parseDetailedComponent(filePath, className, selector, stan
             }
         }
     }
-    // 3. Parseia decorator-based @Output()
     const outputRegex = /@Output(?:\s*\(\s*(['\"][^'\"]+['\"])\s*\))?\s*/g;
     while ((m = outputRegex.exec(block)) !== null) {
         const aliasRaw = m[1];
@@ -85,7 +81,6 @@ export async function parseDetailedComponent(filePath, className, selector, stan
             resolvedType: resolvedType !== (eventType || type) ? resolvedType : undefined
         });
     }
-    // 4. Parseia signal outputs (Angular 17+)
     for (let i = 0; i < signalInputLines.length; i++) {
         const line = signalInputLines[i];
         if (line.includes('= output')) {

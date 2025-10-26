@@ -8,7 +8,7 @@ export async function listPotentialComponentFiles(importMetaUrl: string, library
   const discovered = await discoverLibraries(importMetaUrl);
   let targetLib = discovered;
   if (libraryName) targetLib = discovered.filter((l) => l.name === libraryName);
-  if (targetLib.length === 0 && libraryName) return []; // lib não encontrada
+  if (targetLib.length === 0 && libraryName) return []; 
   if (targetLib.length === 0 && discovered.length > 0) targetLib = discovered.slice(0, 1); // fallback: primeira
   const results: string[] = [];
   for (const lib of targetLib) {
@@ -36,7 +36,8 @@ async function walkComponents(dir: string, acc: string[] = []): Promise<string[]
     const full = path.join(dir, entry);
     if (await statIsDirectory(full)) {
       await walkComponents(full, acc);
-    } else if (/\.component\.ts$/.test(entry)) {
+    } else if (/\.component\.(ts|d\.ts)$/.test(entry)) {
+      // Suporta tanto .component.ts (código fonte) quanto .component.d.ts (compilado)
       acc.push(full);
     }
   }
@@ -47,6 +48,8 @@ export async function extractComponentInfo(filePath: string): Promise<ComponentI
   const content = await readFileIfExists(filePath);
   if (!content) return [];
   const infos: ComponentInfo[] = [];
+  
+  // Tenta extrair componentes com decorador @Component
   const componentRegex = /@Component\s*\(\s*\{([\s\S]*?)\}\s*\)\s*export\s+class\s+(\w+)/g;
   let match: RegExpExecArray | null;
   while ((match = componentRegex.exec(content)) !== null) {
@@ -58,13 +61,17 @@ export async function extractComponentInfo(filePath: string): Promise<ComponentI
     const standalone = standaloneMatch ? standaloneMatch[1] === 'true' : undefined;
     infos.push({ name: className, file: filePath, selector, standalone });
   }
+  
+  // Se não encontrou com @Component, tenta extrair classes Component (arquivos .d.ts)
   if (infos.length === 0) {
-    const classRegex = /export\s+class\s+(\w+Component)\b/g;
+    // Suporta: export class, export declare class
+    const classRegex = /export\s+(?:declare\s+)?class\s+(\w+Component)\b/g;
     while ((match = classRegex.exec(content)) !== null) {
       const className = match[1];
       infos.push({ name: className, file: filePath });
     }
   }
+  
   return infos;
 }
 
