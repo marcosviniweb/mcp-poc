@@ -1,15 +1,33 @@
 import path from 'node:path';
 import { ComponentInfo } from './types.js';
 import { collectExportChain } from './exports.js';
-import { PUBLIC_API_RELATIVE, readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory } from './utils.js';
+import { readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory, discoverLibraries, getLibraryEntryPoints } from './utils.js';
 
-export async function listPotentialComponentFiles(importMetaUrl: string): Promise<string[]> {
+export async function listPotentialComponentFiles(importMetaUrl: string, libraryName?: string, entryPointName?: string): Promise<string[]> {
   const WORKSPACE_ROOT = await resolveWorkspaceRoot(importMetaUrl);
-  const publicApiPath = path.resolve(WORKSPACE_ROOT, PUBLIC_API_RELATIVE);
-  const chain = await collectExportChain(publicApiPath, readFileIfExists);
-  if (chain.length > 0) return chain;
-  const componentsDir = path.resolve(WORKSPACE_ROOT, 'projects','my-lib','src','lib','components');
-  return await walkComponents(componentsDir);
+  const discovered = await discoverLibraries(importMetaUrl);
+  let targetLib = discovered;
+  if (libraryName) targetLib = discovered.filter((l) => l.name === libraryName);
+  if (targetLib.length === 0 && libraryName) return []; 
+  if (targetLib.length === 0 && discovered.length > 0) targetLib = discovered.slice(0, 1); // fallback: primeira
+  const results: string[] = [];
+  for (const lib of targetLib) {
+    const entryPoints = await getLibraryEntryPoints(lib);
+    const targetEps = entryPointName
+      ? entryPoints.filter(e => e.name === entryPointName || e.path.endsWith(entryPointName))
+      : entryPoints;
+    for (const ep of targetEps) {
+      const chain = await collectExportChain(ep.entryFile, readFileIfExists);
+      if (chain.length > 0) {
+        results.push(...chain);
+        continue;
+      }
+      const componentsDir = path.resolve(ep.path, 'src','lib','components');
+      const walked = await walkComponents(componentsDir);
+      results.push(...walked);
+    }
+  }
+  return Array.from(new Set(results));
 }
 
 async function walkComponents(dir: string, acc: string[] = []): Promise<string[]> {
@@ -18,7 +36,8 @@ async function walkComponents(dir: string, acc: string[] = []): Promise<string[]
     const full = path.join(dir, entry);
     if (await statIsDirectory(full)) {
       await walkComponents(full, acc);
-    } else if (/\.component\.ts$/.test(entry)) {
+    } else if (/\.component\.(ts|d\.ts)$/.test(entry)) {
+      // Suporta tanto .component.ts (código fonte) quanto .component.d.ts (compilado)
       acc.push(full);
     }
   }
@@ -29,6 +48,8 @@ export async function extractComponentInfo(filePath: string): Promise<ComponentI
   const content = await readFileIfExists(filePath);
   if (!content) return [];
   const infos: ComponentInfo[] = [];
+  
+  // Tenta extrair componentes com decorador @Component
   const componentRegex = /@Component\s*\(\s*\{([\s\S]*?)\}\s*\)\s*export\s+class\s+(\w+)/g;
   let match: RegExpExecArray | null;
   while ((match = componentRegex.exec(content)) !== null) {
@@ -40,13 +61,17 @@ export async function extractComponentInfo(filePath: string): Promise<ComponentI
     const standalone = standaloneMatch ? standaloneMatch[1] === 'true' : undefined;
     infos.push({ name: className, file: filePath, selector, standalone });
   }
+  
+  // Se não encontrou com @Component, tenta extrair classes Component (arquivos .d.ts)
   if (infos.length === 0) {
-    const classRegex = /export\s+class\s+(\w+Component)\b/g;
+    // Suporta: export class, export declare class
+    const classRegex = /export\s+(?:declare\s+)?class\s+(\w+Component)\b/g;
     while ((match = classRegex.exec(content)) !== null) {
       const className = match[1];
       infos.push({ name: className, file: filePath });
     }
   }
+  
   return infos;
 }
 

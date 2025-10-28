@@ -1,9 +1,9 @@
 {
   "name": "mcp-lib-components",
-  "version": "1.0.0",
-  "description": "Servidor MCP que lista componentes da lib via public-api.ts",
+  "version": "1.3.0",
+  "description": "Servidor MCP que lista componentes de bibliotecas Angular com suporte a signals, multi-path e estruturas genéricas",
   "type": "module",
-  "main": "main.js",
+  "main": "./build/main.js",
   "bin": {
     "lib-components": "./build/main.js"
   },

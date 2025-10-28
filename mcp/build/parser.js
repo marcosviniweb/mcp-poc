@@ -37,11 +37,13 @@ export function extractLeadingComment(block, decoratorIndex) {
     return text || undefined;
 }
 export function parsePropertyLine(line) {
-    const m = /([A-Za-z_][\w]*)\s*(\?)?\s*:\s*([^=;]+)(?:=\s*([^;]+))?/.exec(line);
+    // Suporta: nome, opcional ? ou !, opcional : tipo, opcional = valor
+    const m = /([A-Za-z_]\w*)\s*([!?])?\s*(?::\s*([^=;]+))?\s*(?:=\s*([^;]+))?/.exec(line);
     if (!m)
         return {};
     const name = m[1];
-    const required = !Boolean(m[2]);
+    const optionalOrDefinite = m[2];
+    const required = optionalOrDefinite === '?' ? false : true;
     const type = cleanWhitespace(m[3]);
     const defaultValue = cleanWhitespace(m[4]);
     return { name, type, required, defaultValue };
@@ -66,6 +68,55 @@ export function generateSampleFromType(type) {
     if (union && union.length > 0)
         return union[0];
     return undefined;
+}
+/**
+ * Parseia signal input do Angular 17+
+ * Exemplos:
+ * - readonly name = input<string>();
+ * - readonly id = input.required<number>();
+ * - readonly config = input<Config>({ default: 'value' });
+ */
+export function parseSignalInput(line) {
+    // readonly name = input<Type>(defaultValue)
+    const signalRegex = /readonly\s+(\w+)\s*=\s*input(?:\.(required))?\s*<([^>]+)>\s*\(([^)]*)\)/;
+    const match = signalRegex.exec(line);
+    if (!match) {
+        // Sem genérico: readonly name = input()
+        const simpleRegex = /readonly\s+(\w+)\s*=\s*input(?:\.(required))?\s*\(\s*([^)]*)\s*\)/;
+        const simpleMatch = simpleRegex.exec(line);
+        if (simpleMatch) {
+            return {
+                name: simpleMatch[1],
+                required: simpleMatch[2] === 'required',
+                defaultValue: cleanWhitespace(simpleMatch[3]) || undefined,
+            };
+        }
+        return {};
+    }
+    const name = match[1];
+    const required = match[2] === 'required';
+    const type = cleanWhitespace(match[3]);
+    const defaultValue = cleanWhitespace(match[4]) || undefined;
+    return { name, type, required, defaultValue };
+}
+/**
+ * Parseia signal output do Angular 17+
+ * Exemplo: readonly clicked = output<MouseEvent>();
+ */
+export function parseSignalOutput(line) {
+    // readonly name = output<Type>()
+    const signalRegex = /readonly\s+(\w+)\s*=\s*output\s*<([^>]+)>\s*\(\s*\)/;
+    const match = signalRegex.exec(line);
+    if (!match) {
+        // Sem genérico: readonly name = output()
+        const simpleRegex = /readonly\s+(\w+)\s*=\s*output\s*\(\s*\)/;
+        const simpleMatch = simpleRegex.exec(line);
+        if (simpleMatch) {
+            return { name: simpleMatch[1] };
+        }
+        return {};
+    }
+    return { name: match[1], type: cleanWhitespace(match[2]) };
 }
 export function buildUsageSnippet(info) {
     if (!info.selector)
