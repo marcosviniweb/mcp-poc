@@ -168,9 +168,9 @@ async function main() {
     if (libs.length > 0) {
       console.error(`\n✓ ${libs.length} biblioteca(s) disponível(is):`);
       libs.forEach(lib => {
-        console.error(`  • ${lib.name}`);
-        console.error(`    Root: ${lib.root}`);
-        console.error(`    Entry: ${path.basename(lib.publicApi)}`);
+        console.error(`• ${lib.name}`);
+        console.error(`Root: ${lib.root}`);
+        console.error(`Entry: ${path.basename(lib.publicApi)}`);
       });
     } else {
       console.error("\n⚠ Nenhuma biblioteca encontrada!");
