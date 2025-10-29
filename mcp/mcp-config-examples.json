@@ -7,9 +7,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib"
+              "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib"
             }
           }
         }
@@ -21,9 +21,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@company\\ui-lib;C:\\projeto\\node_modules\\@company\\forms-lib;C:\\repos-locais\\custom-lib"
+              "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib;<caminho-do-projeto>/node_modules/@company/forms-lib;<caminho-repos>/custom-lib"
             }
           }
         }
@@ -36,11 +36,11 @@
           "lib-components": {
             "command": "node",
             "args": [
-              "C:\\path\\to\\mcp\\build\\main.js",
+              "<caminho-absoluto>/mcp/build/main.js",
               "--libs",
-              "C:\\projeto\\node_modules\\@company\\ui-lib",
-              "C:\\projeto\\node_modules\\@company\\forms-lib",
-              "C:\\repos-locais\\custom-lib"
+              "<caminho-do-projeto>/node_modules/@company/ui-lib",
+              "<caminho-do-projeto>/node_modules/@company/forms-lib",
+              "<caminho-repos>/custom-lib"
             ]
           }
         }
@@ -52,10 +52,10 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "MCP_WORKSPACE_ROOT": "C:\\workspace-angular",
-              "LIB_COMPONENTS_PATHS": "C:\\outro-projeto\\node_modules\\@external\\lib"
+              "MCP_WORKSPACE_ROOT": "<caminho-workspace-angular>",
+              "LIB_COMPONENTS_PATHS": "<caminho-outro-projeto>/node_modules/@external/lib"
             }
           }
         }
@@ -67,9 +67,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "C:\\libs\\my-lib\\dist"
+              "LIB_COMPONENTS_PATHS": "<caminho-libs>/my-lib/dist"
             }
           }
         }
@@ -81,9 +81,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "C:\\projeto\\node_modules\\@angular\\material;C:\\projeto\\node_modules\\@company\\design-system"
+              "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@angular/material;<caminho-do-projeto>/node_modules/@company/design-system"
             }
           }
         }
@@ -96,11 +96,11 @@
           "lib-components": {
             "command": "node",
             "args": [
-              "C:\\path\\to\\mcp\\build\\main.js",
+              "<caminho-absoluto>/mcp/build/main.js",
               "--libs",
-              "C:\\projeto\\node_modules\\@company\\ui-lib",
-              "C:\\repos\\my-lib-source",
-              "C:\\builds\\another-lib\\dist"
+              "<caminho-do-projeto>/node_modules/@company/ui-lib",
+              "<caminho-repos>/my-lib-source",
+              "<caminho-builds>/another-lib/dist"
             ]
           }
         }
@@ -112,9 +112,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["/path/to/mcp/build/main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "/home/user/projeto/node_modules/@company/ui-lib:/home/user/repos/custom-lib"
+              "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib:<caminho-repos>/custom-lib"
             }
           }
         }
@@ -126,9 +126,9 @@
         "mcpServers": {
           "lib-components": {
             "command": "node",
-            "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+            "args": ["<caminho-absoluto>/mcp/build/main.js"],
             "env": {
-              "LIB_COMPONENTS_PATHS": "C:\\nx-workspace\\libs\\ui;C:\\nx-workspace\\libs\\data-access"
+              "LIB_COMPONENTS_PATHS": "<caminho-nx-workspace>/libs/ui;<caminho-nx-workspace>/libs/data-access"
             }
           }
         }
@@ -141,15 +141,103 @@
           "lib-components": {
             "command": "node",
             "args": [
-              "C:\\path\\to\\mcp\\build\\main.js",
+              "<caminho-absoluto>/mcp/build/main.js",
               "--libs",
-              "C:\\monorepo\\packages\\lib-a",
-              "C:\\monorepo\\packages\\lib-b",
-              "C:\\monorepo\\packages\\lib-c"
+              "<caminho-monorepo>/packages/lib-a",
+              "<caminho-monorepo>/packages/lib-b",
+              "<caminho-monorepo>/packages/lib-c"
             ]
           }
         }
       }
+    },
+    "11-github-copilot": {
+      "title": "GitHub Copilot no VS Code",
+      "description": "Configure o MCP Server para uso com GitHub Copilot no Visual Studio Code",
+      "configurations": {
+        "vscode-workspace": {
+          "description": "Configuração por repositório (.vscode/mcp.json) - Recomendado para equipes",
+          "file": ".vscode/mcp.json",
+          "config": {
+            "inputs": [],
+            "servers": {
+              "angular-lib-components": {
+                "command": "node",
+                "args": [
+                  "<caminho-absoluto>/mcp/build/main.js",
+                  "--libs",
+                  "${workspaceFolder}/node_modules/@company/ui-lib",
+                  "${workspaceFolder}/node_modules/@company/forms-lib"
+                ]
+              }
+            }
+          }
+        },
+        "vscode-workspace-env": {
+          "description": "Configuração por repositório com variáveis de ambiente (.vscode/mcp.json)",
+          "file": ".vscode/mcp.json",
+          "config": {
+            "inputs": [],
+            "servers": {
+              "angular-lib-components": {
+                "command": "node",
+                "args": ["<caminho-absoluto>/mcp/build/main.js"],
+                "env": {
+                  "LIB_COMPONENTS_PATHS": "${workspaceFolder}/node_modules/@company/ui-lib;${workspaceFolder}/node_modules/@company/forms-lib"
+                }
+              }
+            }
+          }
+        },
+        "vscode-user-settings": {
+          "description": "Configuração pessoal (settings.json) - Disponível em todos os workspaces",
+          "file": "settings.json",
+          "config": {
+            "github.copilot.chat.mcp.enabled": true,
+            "github.copilot.chat.mcp.servers": {
+              "angular-lib-components": {
+                "command": "node",
+                "args": ["<caminho-absoluto>/mcp/build/main.js"],
+                "env": {
+                  "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib;<caminho-do-projeto>/node_modules/@company/forms-lib"
+                }
+              }
+            }
+          }
+        }
+      },
+      "usage": {
+        "description": "O Copilot poderá usar as seguintes ferramentas:",
+        "tools": [
+          "list-components: Listar todos os componentes Angular disponíveis",
+          "get-component: Obter detalhes completos de um componente específico",
+          "get-library-info: Obter informações da biblioteca (versão, dependências)",
+          "find-library-by-name: Buscar biblioteca por nome"
+        ],
+        "example_prompts": [
+          "Mostre-me todos os componentes disponíveis na biblioteca",
+          "Como uso o componente ButtonComponent?",
+          "Quais são os inputs e outputs do FormFieldComponent?",
+          "Qual a versão da biblioteca @company/ui-lib?",
+          "Crie um exemplo de uso do componente ReusableIoComponent com todos os inputs",
+          "Liste todos os componentes que têm output de eventos"
+        ],
+        "steps": [
+          "1. Adicione a configuração ao arquivo .vscode/mcp.json ou settings.json",
+          "2. Se usar .vscode/mcp.json, clique no botão 'Start' que aparecerá no arquivo",
+          "3. Abra o Copilot Chat (Ctrl+Alt+I)",
+          "4. Selecione 'Agent' no menu do chat",
+          "5. Clique no ícone de ferramentas para ver os servidores MCP disponíveis",
+          "6. Converse naturalmente com o Copilot sobre os componentes"
+        ]
+      },
+      "notes": [
+        "Use apenas uma localização por servidor (ou .vscode/mcp.json ou settings.json)",
+        "Use ${workspaceFolder} para caminhos relativos ao workspace",
+        "No Windows use ; para separar paths, no Linux/Mac use :",
+        "A configuração em .vscode/mcp.json pode ser compartilhada com a equipe via Git",
+        "A configuração em settings.json é pessoal e funciona em todos os workspaces"
+      ]
     }
   },
   "notes": {

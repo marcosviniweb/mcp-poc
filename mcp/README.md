@@ -41,9 +41,9 @@ Três formas principais de apontar bibliotecas:
   "mcpServers": {
     "lib-components": {
       "command": "node",
-      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "args": ["<caminho-absoluto>/mcp/build/main.js"],
       "env": {
-        "LIB_COMPONENTS_PATHS": "C:\\proj\\node_modules\\@company\\ui-lib;C:\\repos\\custom-lib"
+        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib;<caminho-repos>/custom-lib"
       }
     }
   }
@@ -58,10 +58,10 @@ Três formas principais de apontar bibliotecas:
     "lib-components": {
       "command": "node",
       "args": [
-        "C:\\path\\to\\mcp\\build\\main.js",
+        "<caminho-absoluto>/mcp/build/main.js",
         "--libs",
-        "C:\\proj\\node_modules\\@company\\ui-lib",
-        "C:\\repos\\custom-lib"
+        "<caminho-do-projeto>/node_modules/@company/ui-lib",
+        "<caminho-repos>/custom-lib"
       ]
     }
   }
@@ -75,10 +75,10 @@ Três formas principais de apontar bibliotecas:
   "mcpServers": {
     "lib-components": {
       "command": "node",
-      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "args": ["<caminho-absoluto>/mcp/build/main.js"],
       "env": {
-        "MCP_WORKSPACE_ROOT": "C:\\workspace-angular",
-        "LIB_COMPONENTS_PATHS": "C:\\outro-projeto\\node_modules\\@external\\lib"
+        "MCP_WORKSPACE_ROOT": "<caminho-workspace-angular>",
+        "LIB_COMPONENTS_PATHS": "<caminho-outro-projeto>/node_modules/@external/lib"
       }
     }
   }
@@ -88,6 +88,104 @@ Três formas principais de apontar bibliotecas:
 Ordem de prioridade: CLI `--libs` > env `LIB_COMPONENTS_PATHS` > workspace atual (fallback automático).
 
 Formatos suportados: workspace completo (angular.json/workspace.json), biblioteca específica (package.json + src/), biblioteca compilada (dist/.d.ts), pacotes `node_modules`.
+
+## 🤖 Configuração para GitHub Copilot no VS Code
+
+O GitHub Copilot no Visual Studio Code suporta servidores MCP, permitindo que você estenda as capacidades do Copilot com ferramentas customizadas. Existem duas formas de configurar:
+
+### 📁 Opção 1: Configuração por Repositório (Recomendado para Equipes)
+
+Crie um arquivo `.vscode/mcp.json` na raiz do seu repositório. Isso permite compartilhar a configuração com toda a equipe:
+
+```json
+{
+  "inputs": [],
+  "servers": {
+    "angular-lib-components": {
+      "command": "node",
+      "args": [
+        "<caminho-absoluto>/mcp/build/main.js",
+        "--libs",
+        "${workspaceFolder}/node_modules/@company/ui-lib",
+        "${workspaceFolder}/node_modules/@company/forms-lib"
+      ]
+    }
+  }
+}
+```
+
+**Ou usando variáveis de ambiente:**
+
+```json
+{
+  "inputs": [],
+  "servers": {
+    "angular-lib-components": {
+      "command": "node",
+      "args": ["<caminho-absoluto>/mcp/build/main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "${workspaceFolder}/node_modules/@company/ui-lib;${workspaceFolder}/node_modules/@company/forms-lib"
+      }
+    }
+  }
+}
+```
+
+### 👤 Opção 2: Configuração Pessoal (Disponível em Todos os Workspaces)
+
+Adicione ao seu `settings.json` do VS Code (Ctrl+Shift+P → "Preferences: Open User Settings (JSON)"):
+
+```json
+{
+  "github.copilot.chat.mcp.enabled": true,
+  "github.copilot.chat.mcp.servers": {
+    "angular-lib-components": {
+      "command": "node",
+      "args": ["<caminho-absoluto>/mcp/build/main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/ui-lib;<caminho-do-projeto>/forms-lib"
+      }
+    }
+  }
+}
+```
+
+### 🚀 Como Usar
+
+1. **Iniciar o servidor**: Após configurar, um botão "Start" aparecerá no arquivo `.vscode/mcp.json`. Clique para iniciar o servidor.
+
+2. **Abrir o Copilot Chat**: Clique no ícone do Copilot na barra lateral ou pressione `Ctrl+Alt+I`.
+
+3. **Selecionar Agent**: Na caixa do Copilot Chat, selecione "Agent" no menu.
+
+4. **Ver ferramentas disponíveis**: Clique no ícone de ferramentas (🔧) no canto superior da caixa de chat para ver os servidores MCP e ferramentas disponíveis.
+
+### 🛠️ Ferramentas Disponíveis
+
+O Copilot poderá usar automaticamente estas ferramentas:
+
+- **list-components** - Lista todos os componentes Angular disponíveis
+- **get-component** - Obtém detalhes completos de um componente (inputs, outputs, selector)
+- **get-library-info** - Obtém informações da biblioteca (versão, dependências)
+- **find-library-by-name** - Busca biblioteca por nome
+
+### 💬 Exemplos de Prompts
+
+Depois de configurado, você pode conversar naturalmente com o Copilot:
+
+- "Mostre-me todos os componentes disponíveis na biblioteca"
+- "Como uso o componente ButtonComponent?"
+- "Quais são os inputs e outputs do FormFieldComponent?"
+- "Qual a versão da biblioteca @company/ui-lib?"
+- "Crie um exemplo de uso do componente ReusableIoComponent com todos os inputs"
+- "Liste todos os componentes que têm output de eventos"
+
+### ⚠️ Importante
+
+- **Não use ambas as configurações**: Configurar o mesmo servidor em `.vscode/mcp.json` e `settings.json` pode causar conflitos.
+- **Caminhos absolutos**: Use caminhos absolutos ou a variável `${workspaceFolder}` para evitar problemas.
+- **Separadores**: No Windows use `;` para separar múltiplos paths, no Linux/Mac use `:`.
+
 
 
 
@@ -148,9 +246,9 @@ Para bibliotecas instaladas via Nexus no `node_modules` do projeto, aponte diret
   "mcpServers": {
     "lib-components": {
       "command": "node",
-      "args": ["C:\\path\\to\\mcp\\build\\main.js"],
+      "args": ["<caminho-absoluto>/mcp/build/main.js"],
       "env": {
-        "LIB_COMPONENTS_PATHS": "C:\\seu-projeto\\node_modules\\@company\\ui;C:\\seu-projeto\\node_modules\\@company\\forms"
+        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui;<caminho-do-projeto>/node_modules/@company/forms"
       }
     }
   }

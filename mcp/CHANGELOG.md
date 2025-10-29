@@ -134,13 +134,6 @@ Este update permite que projetos usem o MCP para:
 - ✅ Compatível com workspaces existentes
 - ✅ Sem breaking changes
 
-#### 📚 Documentação
-
-- [GENERIC-STRUCTURE-SUPPORT.md](./GENERIC-STRUCTURE-SUPPORT.md) - Guia completo de estruturas suportadas
-
----
-
-## [1.1.0] - 2024-10-24
 
 ### ✨ Novas Funcionalidades
 
