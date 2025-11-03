@@ -97,21 +97,11 @@ def collectLuminaImports() {
 
     utilsMessageLib.infoMsg(">>> [DEBUG] Iniciando coleta de blocks...")
     
-    // Abordagem 1: Tentar com sed multi-linha
-    def blocksFound = sh(script: '''
-        find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r file; do
-            [ -f "$file" ] || continue
-            cat "$file" | tr '\\n' ' ' | grep -oE 'import[[:space:]]*\\{[^}]+\\}[[:space:]]*from[[:space:]]*["'"'"']@luds/ui/blocks/[^"'"'"']+["'"'"']' | 
-            sed 's/.*{//; s/}.*//' | 
-            tr ',' '\\n' | 
-            sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | 
-            grep -E '^[A-Z]' | 
-            grep -v '^$'
-        done | sort | uniq
-    ''', returnStdout: true).trim()
+    // Estratégia melhorada: Processa imports multi-linha e de uma linha
+    def blocksFound = extractImportsFromFiles("@luds/ui/blocks")
 
-    if (blocksFound) {
-        imports.blocks = blocksFound.split('\n').findAll { it.trim() }.collect { it.trim() }
+    if (blocksFound && blocksFound.trim()) {
+        imports.blocks = blocksFound.split('\n').findAll { it.trim() && it.trim().matches(/^[A-Z].*/) }.collect { it.trim() }
         utilsMessageLib.infoMsg(">>> [DEBUG] Blocks encontrados: ${imports.blocks.size()} itens - ${imports.blocks.join(', ')}")
     } else {
         utilsMessageLib.warnMsg(">>> [DEBUG] Nenhum block encontrado!")
@@ -119,21 +109,10 @@ def collectLuminaImports() {
 
     utilsMessageLib.infoMsg(">>> [DEBUG] Iniciando coleta de components...")
     
-    // Abordagem 2: Mesma lógica para components
-    def componentsFound = sh(script: '''
-        find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r file; do
-            [ -f "$file" ] || continue
-            cat "$file" | tr '\\n' ' ' | grep -oE 'import[[:space:]]*\\{[^}]+\\}[[:space:]]*from[[:space:]]*["'"'"']@luds/ui/components/[^"'"'"']+["'"'"']' | 
-            sed 's/.*{//; s/}.*//' | 
-            tr ',' '\\n' | 
-            sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | 
-            grep -E '^[A-Z]' | 
-            grep -v '^$'
-        done | sort | uniq
-    ''', returnStdout: true).trim()
+    def componentsFound = extractImportsFromFiles("@luds/ui/components")
 
-    if (componentsFound) {
-        imports.components = componentsFound.split('\n').findAll { it.trim() }.collect { it.trim() }
+    if (componentsFound && componentsFound.trim()) {
+        imports.components = componentsFound.split('\n').findAll { it.trim() && it.trim().matches(/^[A-Z].*/) }.collect { it.trim() }
         utilsMessageLib.infoMsg(">>> [DEBUG] Components encontrados: ${imports.components.size()} itens - ${imports.components.join(', ')}")
     } else {
         utilsMessageLib.warnMsg(">>> [DEBUG] Nenhum component encontrado!")
@@ -158,17 +137,101 @@ def collectLuminaImports() {
         utilsMessageLib.warnMsg(">>> [DEBUG] Nenhum theme encontrado!")
     }
 
-    // Coletar classes utilitárias (não necessário no momento)
-    // def utilityClassesFound = sh(script: '''
-    //     find . \\( -name "*.html" -o -name "*.ts" \\) -print0 2>/dev/null | xargs -0 -r grep -ho "class=['\\\"][^'\\\"]*luds-[a-zA-Z0-9-_]*[^'\\\"]*['\\\"]" 2>/dev/null |
-    //     grep -o "luds-[a-zA-Z0-9-_]*" | grep -v "^\\$" | sort | uniq
-    // ''', returnStdout: true).trim()
-
-    // if (utilityClassesFound) {
-    //     imports.utility_classes = utilityClassesFound.split('\n').findAll { it.trim() }
-    // }
-
     return imports
+}
+
+/**
+ * Extrai imports do LUDS de arquivos TypeScript/JavaScript
+ * Funciona com imports de uma linha e multi-linha
+ * @param basePath Caminho base do import (ex: "@luds/ui/blocks" ou "@luds/ui/components")
+ * @return String com lista de componentes encontrados (um por linha)
+ */
+def extractImportsFromFiles(String basePath) {
+    // Escapa caracteres especiais para uso em regex do awk
+    def escapedPath = basePath.replace('\\', '\\\\')
+                               .replace('[', '\\[')
+                               .replace(']', '\\]')
+                               .replace('.', '\\.')
+                               .replace('/', '\\/')
+                               .replace('@', '\\@')
+    
+    return sh(script: """
+        find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r file; do
+            [ -f "\\$file" ] || continue
+            
+            # Estratégia melhorada: Normaliza imports multi-linha e extrai componentes
+            awk -v base_path='${escapedPath}' '
+            BEGIN {
+                in_import = 0
+                import_buffer = ""
+                brace_count = 0
+            }
+            {
+                # Remove comentários de linha (mas preserva estrutura para detectar imports)
+                original = \\$0
+                gsub(/\\/\\/.*/, "", \\$0)
+                line = \\$0
+                
+                # Detecta início de import statement
+                if (match(line, /import[[:space:]]+\\{/)) {
+                    in_import = 1
+                    import_buffer = line
+                    # Conta chaves balanceadas
+                    brace_count = 0
+                    for (i = 1; i <= length(line); i++) {
+                        c = substr(line, i, 1)
+                        if (c == "{") brace_count++
+                        if (c == "}") brace_count--
+                    }
+                }
+                else if (in_import) {
+                    # Continua acumulando linhas enquanto o import não termina
+                    import_buffer = import_buffer " " line
+                    for (i = 1; i <= length(line); i++) {
+                        c = substr(line, i, 1)
+                        if (c == "{") brace_count++
+                        if (c == "}") brace_count--
+                    }
+                }
+                
+                # Quando brace_count == 0, o import está completo
+                if (in_import && brace_count == 0) {
+                    # Verifica se é do caminho desejado
+                    pattern = "from[[:space:]]+[\"'"'"']" base_path "[^\"'"'"']+[\"'"'"']"
+                    if (match(import_buffer, pattern)) {
+                        # Extrai conteúdo entre chaves usando regex
+                        if (match(import_buffer, /import[[:space:]]+\\{([^}]+)\\}/, arr)) {
+                            content = arr[1]
+                            # Normaliza: múltiplos espaços vira um espaço
+                            gsub(/[[:space:]]+/, " ", content)
+                            gsub(/^[[:space:]]+|[[:space:]]+\$/, "", content)
+                            
+                            # Divide por vírgulas e processa cada item
+                            n = split(content, items, ",")
+                            for (i = 1; i <= n; i++) {
+                                item = items[i]
+                                # Remove espaços do início e fim
+                                gsub(/^[[:space:]]+|[[:space:]]+\$/, "", item)
+                                # Remove aliases (ex: "Component as Alias" -> "Component")
+                                gsub(/[[:space:]]+as[[:space:]]+[A-Za-z0-9_]+\$/, "", item)
+                                # Remove espaços extras novamente
+                                gsub(/^[[:space:]]+|[[:space:]]+\$/, "", item)
+                                # Extrai nome do componente (deve começar com letra maiúscula)
+                                if (match(item, /([A-Z][A-Za-z0-9_]*)/, name_arr)) {
+                                    print name_arr[1]
+                                }
+                            }
+                        }
+                    }
+                    # Reset para próximo import
+                    in_import = 0
+                    import_buffer = ""
+                    brace_count = 0
+                }
+            }
+            ' "\\$file" 2>/dev/null
+        done | sort | uniq
+    """, returnStdout: true).trim()
 }
 
 /*
