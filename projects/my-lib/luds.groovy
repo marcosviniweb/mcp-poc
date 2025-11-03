@@ -148,19 +148,25 @@ def collectLuminaImports() {
  */
 def extractImportsFromFiles(String basePath) {
     // Escapa caracteres especiais para uso em regex do awk
+    // Escapa também para shell
     def escapedPath = basePath.replace('\\', '\\\\')
                                .replace('[', '\\[')
                                .replace(']', '\\]')
                                .replace('.', '\\.')
                                .replace('/', '\\/')
                                .replace('@', '\\@')
+                               .replace("'", "'\\''") // Escapa aspas simples para shell
+    
+    // Variável para $0 do awk (precisa de escape triplo em string tripla)
+    def awkDollarZero = '\\$0'
     
     return sh(script: """
+        export BASE_PATH="${escapedPath}"
         find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r file; do
             [ -f "\\$file" ] || continue
             
             # Estratégia melhorada: Normaliza imports multi-linha e extrai componentes
-            awk -v base_path='${escapedPath}' '
+            awk -v base_path="\\$BASE_PATH" '
             BEGIN {
                 in_import = 0
                 import_buffer = ""
@@ -168,9 +174,9 @@ def extractImportsFromFiles(String basePath) {
             }
             {
                 # Remove comentários de linha (mas preserva estrutura para detectar imports)
-                original = \\$0
-                gsub(/\\/\\/.*/, "", \\$0)
-                line = \\$0
+                original = ${awkDollarZero}
+                gsub(/\\/\\/.*/, "", ${awkDollarZero})
+                line = ${awkDollarZero}
                 
                 # Detecta início de import statement
                 if (match(line, /import[[:space:]]+\\{/)) {
