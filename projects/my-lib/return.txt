@@ -1,0 +1,52 @@
++ read -r file
++ '[' -f ./src/assets/styles/generic/_reset.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/assets/styles/generic/_reset.scss
++ sed 's/["'\''].*//'
++ sed 's/.*themes\///'
++ read -r file
++ '[' -f ./src/assets/styles/settings/_mixins.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/assets/styles/settings/_mixins.scss
++ sed 's/["'\''].*//'
++ sed 's/.*themes\///'
++ read -r file
++ '[' -f ./src/assets/styles/settings/_placeholders.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/assets/styles/settings/_placeholders.scss
++ sed 's/["'\''].*//'
++ sed 's/.*themes\///'
++ read -r file
++ '[' -f ./src/assets/styles/settings/_variables.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/assets/styles/settings/_variables.scss
++ sed 's/.*themes\///'
++ sed 's/["'\''].*//'
++ read -r file
++ '[' -f ./src/assets/styles/tools/_fonts.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/assets/styles/tools/_fonts.scss
++ sed 's/.*themes\///'
++ sed 's/["'\''].*//'
++ read -r file
++ '[' -f ./src/styles.scss ']'
++ grep -oE '@use[[:space:]]*["'\'']@luds/ui/styles/themes/[^"'\'']+' ./src/styles.scss
++ sed 's/.*themes\///'
++ sed 's/["'\''].*//'
++ read -r file
+[INFO] 2025-11-03 13:09:32 - >>> [DEBUG] Themes encontrados: 1 itens - default
+[INFO] 2025-11-03 13:09:32 - >>> Lumina Data JSON: {
+    "lumina_setup": true,
+    "analysis_date": "03-11-2025 13:09:27",
+    "gearr_id": "10569",
+    "lumina_version": "1.0.1",
+    "lumina_usage": {
+        "blocks": [
+            
+        ],
+        "components": [
+            
+        ],
+        "themes": [
+            "default"
+        ]
+    }
+}
+[INFO] 2025-11-03 13:09:32 - Esse módulo base foi executado conforme esperado!
+[INFO] 2025-11-03 13:09:32 - End task : [luds]
+[INFO] 2025-11-03 13:09:32 - End stage : [BEFORE_BUILD]
