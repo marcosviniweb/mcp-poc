@@ -147,96 +147,50 @@ def collectLuminaImports() {
  * @return String com lista de componentes encontrados (um por linha)
  */
 def extractImportsFromFiles(String basePath) {
-    // Escapa caracteres especiais para uso em regex do awk
-    // Escapa também para shell
-    def escapedPath = basePath.replace('\\', '\\\\')
-                               .replace('[', '\\[')
-                               .replace(']', '\\]')
-                               .replace('.', '\\.')
-                               .replace('/', '\\/')
-                               .replace('@', '\\@')
-                               .replace("'", "'\\''") // Escapa aspas simples para shell
-    
     // Variáveis para evitar problemas de interpolação do Groovy
-    def awkDollarZero = '\\$0'
     def shellDollar = '\\$'
     
     return sh(script: """
-        export BASE_PATH="${escapedPath}"
+        # Encontra todos os arquivos TypeScript/JavaScript
         find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r f; do
             [ -f "${shellDollar}f" ] || continue
             
-            # Estratégia melhorada: Normaliza imports multi-linha e extrai componentes
-            awk -v base_path="${shellDollar}BASE_PATH" '
-            BEGIN {
-                in_import = 0
-                import_buffer = ""
-                brace_count = 0
-            }
-            {
-                # Remove comentários de linha (mas preserva estrutura para detectar imports)
-                original = ${awkDollarZero}
-                gsub(/\\/\\/.*/, "", ${awkDollarZero})
-                line = ${awkDollarZero}
-                
-                # Detecta início de import statement
-                if (match(line, /import[[:space:]]+\\{/)) {
+            # Processa o arquivo: normaliza quebras de linha em imports e extrai componentes
+            cat "${shellDollar}f" | \\
+            # Remove comentários de linha
+            sed 's|//.*||' | \\
+            # Junta linhas: remove quebra de linha depois de vírgula ou abre chave em imports
+            awk '
+                /import[[:space:]]+\\{/ { 
                     in_import = 1
-                    import_buffer = line
-                    # Conta chaves balanceadas
-                    brace_count = 0
-                    for (i = 1; i <= length(line); i++) {
-                        c = substr(line, i, 1)
-                        if (c == "{") brace_count++
-                        if (c == "}") brace_count--
-                    }
+                    buffer = ${shellDollar}0
                 }
-                else if (in_import) {
-                    # Continua acumulando linhas enquanto o import não termina
-                    import_buffer = import_buffer " " line
-                    for (i = 1; i <= length(line); i++) {
-                        c = substr(line, i, 1)
-                        if (c == "{") brace_count++
-                        if (c == "}") brace_count--
-                    }
+                in_import && !/\\}/ {
+                    if (NR > 1 && buffer != "") buffer = buffer " " ${shellDollar}0
+                    next
                 }
-                
-                # Quando brace_count == 0, o import está completo
-                if (in_import && brace_count == 0) {
-                    # Verifica se é do caminho desejado
-                    pattern = "from[[:space:]]+[\"'"'"']" base_path "[^\"'"'"']+[\"'"'"']"
-                    if (match(import_buffer, pattern)) {
-                        # Extrai conteúdo entre chaves usando regex
-                        if (match(import_buffer, /import[[:space:]]+\\{([^}]+)\\}/, arr)) {
-                            content = arr[1]
-                            # Normaliza: múltiplos espaços vira um espaço
-                            gsub(/[[:space:]]+/, " ", content)
-                            gsub(/^[[:space:]]+|[[:space:]]+\$/, "", content)
-                            
-                            # Divide por vírgulas e processa cada item
-                            n = split(content, items, ",")
-                            for (i = 1; i <= n; i++) {
-                                item = items[i]
-                                # Remove espaços do início e fim
-                                gsub(/^[[:space:]]+|[[:space:]]+\$/, "", item)
-                                # Remove aliases (ex: "Component as Alias" -> "Component")
-                                gsub(/[[:space:]]+as[[:space:]]+[A-Za-z0-9_]+\$/, "", item)
-                                # Remove espaços extras novamente
-                                gsub(/^[[:space:]]+|[[:space:]]+\$/, "", item)
-                                # Extrai nome do componente (deve começar com letra maiúscula)
-                                if (match(item, /([A-Z][A-Za-z0-9_]*)/, name_arr)) {
-                                    print name_arr[1]
-                                }
-                            }
-                        }
-                    }
-                    # Reset para próximo import
+                in_import && /\\}/ {
+                    print buffer " " ${shellDollar}0
                     in_import = 0
-                    import_buffer = ""
-                    brace_count = 0
+                    buffer = ""
+                    next
                 }
-            }
-            ' "${shellDollar}f" 2>/dev/null
+                !in_import { print }
+            ' | \\
+            # Filtra apenas imports do caminho desejado
+            grep -E 'import[[:space:]]+\\{[^}]+\\}[[:space:]]+from[[:space:]]+["'"'"']${basePath}' | \\
+            # Extrai o conteúdo entre chaves
+            sed -E 's/.*import[[:space:]]+\\{([^}]+)\\}.*/\\1/' | \\
+            # Divide por vírgulas (uma por linha)
+            tr ',' '\\n' | \\
+            # Remove espaços do início e fim
+            sed 's/^[[:space:]]*//; s/[[:space:]]*${shellDollar}//' | \\
+            # Remove aliases (ex: "Component as Alias" -> "Component")
+            sed 's/[[:space:]]+as[[:space:]]+[A-Za-z0-9_]*${shellDollar}//' | \\
+            # Filtra apenas nomes que começam com maiúscula
+            grep -E '^[A-Z][A-Za-z0-9_]*' | \\
+            # Remove linhas vazias
+            grep -v '^${shellDollar}'
         done | sort | uniq
     """, returnStdout: true).trim()
 }
