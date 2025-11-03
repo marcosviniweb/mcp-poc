@@ -99,6 +99,9 @@ def collectLuminaImports() {
     
     // Estratégia melhorada: Processa imports multi-linha e de uma linha
     def blocksFound = extractImportsFromFiles("@luds/ui/blocks")
+    
+    // Debug temporário
+    utilsMessageLib.infoMsg(">>> [DEBUG] Raw blocks output: '${blocksFound}'")
 
     if (blocksFound && blocksFound.trim()) {
         imports.blocks = blocksFound.split('\n').findAll { it.trim() && it.trim().matches(/^[A-Z].*/) }.collect { it.trim() }
@@ -149,48 +152,76 @@ def collectLuminaImports() {
 def extractImportsFromFiles(String basePath) {
     // Variáveis para evitar problemas de interpolação do Groovy
     def shellDollar = '\\$'
+    // Escapa basePath para uso seguro no awk
+    def safeBasePath = basePath.replace("'", "'\\''")
     
     return sh(script: """
-        # Encontra todos os arquivos TypeScript/JavaScript
         find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r f; do
             [ -f "${shellDollar}f" ] || continue
             
-            # Processa o arquivo: normaliza quebras de linha em imports e extrai componentes
-            cat "${shellDollar}f" | \\
-            # Remove comentários de linha
-            sed 's|//.*||' | \\
-            # Junta linhas: remove quebra de linha depois de vírgula ou abre chave em imports
-            awk '
-                /import[[:space:]]+\\{/ { 
+            # Processa arquivo com awk: detecta e processa imports multi-linha
+            awk -v base_path='${safeBasePath}' '
+            BEGIN {
+                in_import = 0
+                import_buffer = ""
+                open_braces = 0
+            }
+            {
+                # Remove comentários de linha
+                gsub(/\\/\\/.*/, "", ${shellDollar}0)
+                
+                # Detecta início de import statement
+                if (match(${shellDollar}0, /import[[:space:]]+\\{/)) {
                     in_import = 1
-                    buffer = ${shellDollar}0
+                    import_buffer = ${shellDollar}0
+                    # Conta chaves abertas e fechadas na linha atual
+                    gsub(/{/, "", temp); open_braces = length(temp)
+                    gsub(/}/, "", temp); open_braces = open_braces - length(temp)
+                    delete temp
                 }
-                in_import && !/\\}/ {
-                    if (NR > 1 && buffer != "") buffer = buffer " " ${shellDollar}0
-                    next
+                else if (in_import) {
+                    # Continua acumulando linhas do import
+                    import_buffer = import_buffer " " ${shellDollar}0
+                    # Conta chaves adicionais
+                    gsub(/{/, "", temp); open_braces = open_braces + length(temp)
+                    gsub(/}/, "", temp); open_braces = open_braces - length(temp)
+                    delete temp
                 }
-                in_import && /\\}/ {
-                    print buffer " " ${shellDollar}0
+                
+                # Quando import está completo (open_braces == 0)
+                if (in_import && open_braces == 0) {
+                    # Verifica se é do caminho correto usando index (mais confiável que regex)
+                    if (index(import_buffer, "from") > 0 && index(import_buffer, base_path) > 0) {
+                        # Extrai conteúdo entre chaves usando regex
+                        if (match(import_buffer, /import[[:space:]]+\\{([^}]+)\\}/, arr)) {
+                            content = arr[1]
+                            # Normaliza espaços
+                            gsub(/[[:space:]]+/, " ", content)
+                            gsub(/^[[:space:]]+|[[:space:]]+${shellDollar}/, "", content)
+                            
+                            # Divide por vírgulas
+                            n = split(content, items, ",")
+                            for (i = 1; i <= n; i++) {
+                                item = items[i]
+                                # Remove espaços
+                                gsub(/^[[:space:]]+|[[:space:]]+${shellDollar}/, "", item)
+                                # Remove aliases
+                                gsub(/[[:space:]]+as[[:space:]]+[A-Za-z0-9_]+${shellDollar}/, "", item)
+                                gsub(/^[[:space:]]+|[[:space:]]+${shellDollar}/, "", item)
+                                # Extrai nome (começa com maiúscula)
+                                if (match(item, /([A-Z][A-Za-z0-9_]*)/, name_arr)) {
+                                    print name_arr[1]
+                                }
+                            }
+                        }
+                    }
+                    # Reset
                     in_import = 0
-                    buffer = ""
-                    next
+                    import_buffer = ""
+                    open_braces = 0
                 }
-                !in_import { print }
-            ' | \\
-            # Filtra apenas imports do caminho desejado
-            grep -E 'import[[:space:]]+\\{[^}]+\\}[[:space:]]+from[[:space:]]+["'"'"']${basePath}' | \\
-            # Extrai o conteúdo entre chaves
-            sed -E 's/.*import[[:space:]]+\\{([^}]+)\\}.*/\\1/' | \\
-            # Divide por vírgulas (uma por linha)
-            tr ',' '\\n' | \\
-            # Remove espaços do início e fim
-            sed 's/^[[:space:]]*//; s/[[:space:]]*${shellDollar}//' | \\
-            # Remove aliases (ex: "Component as Alias" -> "Component")
-            sed 's/[[:space:]]+as[[:space:]]+[A-Za-z0-9_]*${shellDollar}//' | \\
-            # Filtra apenas nomes que começam com maiúscula
-            grep -E '^[A-Z][A-Za-z0-9_]*' | \\
-            # Remove linhas vazias
-            grep -v '^${shellDollar}'
+            }
+            ' "${shellDollar}f" 2>/dev/null
         done | sort | uniq
     """, returnStdout: true).trim()
 }
