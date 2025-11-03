@@ -157,16 +157,17 @@ def extractImportsFromFiles(String basePath) {
                                .replace('@', '\\@')
                                .replace("'", "'\\''") // Escapa aspas simples para shell
     
-    // Variável para $0 do awk (precisa de escape triplo em string tripla)
+    // Variáveis para evitar problemas de interpolação do Groovy
     def awkDollarZero = '\\$0'
+    def shellDollar = '\\$'
     
     return sh(script: """
         export BASE_PATH="${escapedPath}"
-        find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r file; do
-            [ -f "\\$file" ] || continue
+        find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" 2>/dev/null | while read -r f; do
+            [ -f "${shellDollar}f" ] || continue
             
             # Estratégia melhorada: Normaliza imports multi-linha e extrai componentes
-            awk -v base_path="\\$BASE_PATH" '
+            awk -v base_path="${shellDollar}BASE_PATH" '
             BEGIN {
                 in_import = 0
                 import_buffer = ""
@@ -235,7 +236,7 @@ def extractImportsFromFiles(String basePath) {
                     brace_count = 0
                 }
             }
-            ' "\\$file" 2>/dev/null
+            ' "${shellDollar}f" 2>/dev/null
         done | sort | uniq
     """, returnStdout: true).trim()
 }
