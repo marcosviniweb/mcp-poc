@@ -5,11 +5,13 @@ import { z } from "zod";
 import path from "node:path";
 import { resolveWorkspaceRoot, readFileIfExists, discoverLibraries, statIsDirectory } from "./utils.js";
 import { listPotentialComponentFiles, extractComponentInfo } from "./scanner.js";
-import { parseDetailedComponent } from "./docs.js";
+import { parseDetailedComponent, findDocumentationExamples } from "./docs.js";
 import { buildUsageSnippet } from "./parser.js";
 import { findMarkdownFiles, findWorkspaceRoots, getPossibleDocsPaths } from "./markdown-search.js";
 const server = new McpServer({ name: "lyra", version: "1.3.0" });
-
+// ============================================================================
+// AVISOS IMPORTANTES - Sempre incluídos nas respostas
+// ============================================================================
 const NO_STYLE_HEADER = `
 🚨 ATENÇÃO: NÃO ADICIONE ESTILIZAÇÃO NOS COMPONENTES 🚨
 Os componentes do Design System JÁ POSSUEM design próprio.
@@ -42,7 +44,6 @@ const NO_STYLE_FOOTER = `
 // ============================================================================
 // PROMPTS - Reusable templates para guiar a interação com LLMs
 // ============================================================================
-
 server.prompt("no-styling-guidelines", "🚨 REGRAS: Nunca adicione CSS nos componentes , mas PODE usar em containers ao redor", {}, () => ({
     messages: [
         {
@@ -94,7 +95,6 @@ Os componentes JÁ POSSUEM todo o design necessário.`
         }
     ]
 }));
-
 server.tool("list-components", "Lista todos os componentes Angular da biblioteca. Use quando o usuário perguntar: 'quais componentes', 'liste componentes', 'mostre componentes', 'componentes disponíveis'. ⚠️ IMPORTANTE: Componentes devem ser usados puros (sem class/style neles). Pode usar CSS em containers ao redor.", { libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)"), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") }, async ({ libraryName, entryPoint }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
     const libs = await discoverLibraries(import.meta.url);
@@ -119,7 +119,6 @@ server.tool("list-components", "Lista todos os componentes Angular da biblioteca
         .join("\n");
     return { content: [{ type: "text", text: NO_STYLE_HEADER + text + NO_STYLE_FOOTER }] };
 });
-
 server.tool("get-component", "Obtém detalhes completos de um componente (inputs, outputs, selector, uso). Use quando o usuário perguntar sobre um componente específico, seus inputs/outputs, como usar, propriedades, eventos. ⚠️ IMPORTANTE: Forneça exemplo com componente  PURO (sem class/style nele). PODE usar CSS em container ao redor para apresentação.", { name: z.string().min(1).describe("Nome da classe do componente, ex.: ButtonComponent"), libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)"), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") }, async ({ name, libraryName, entryPoint }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
     const files = await listPotentialComponentFiles(import.meta.url, libraryName, entryPoint);
@@ -129,6 +128,8 @@ server.tool("get-component", "Obtém detalhes completos de um componente (inputs
         if (found) {
             const detailed = await parseDetailedComponent(found.file, found.name, found.selector, found.standalone, found.type);
             const rel = path.relative(root, detailed.file);
+            // 1. Tenta buscar exemplos da documentação primeiro
+            const docExample = await findDocumentationExamples(found.name, found.file);
             const inputs = (detailed.inputs || []).map((i) => {
                 const kindLabel = i.kind === 'signal' ? '🔵 signal' : '🟢 decorator';
                 const typeInfo = i.resolvedType || i.type || 'any';
@@ -143,7 +144,8 @@ server.tool("get-component", "Obtém detalhes completos de um componente (inputs
                 const desc = o.description ? ` // ${o.description}` : '';
                 return `  - ${o.alias || o.name}: ${typeInfo} [${kindLabel}]${desc}`;
             }).join('\n') || '  (nenhum)';
-            const usage = buildUsageSnippet(detailed);
+            // 2. Se não encontrou documentação, gera exemplo sintético
+            const usage = docExample || buildUsageSnippet(detailed);
             const typeLabel = detailed.type === 'directive' ? 'Diretiva' : 'Componente';
             const detail = [
                 `Nome: ${detailed.name}`,
@@ -165,7 +167,6 @@ server.tool("get-component", "Obtém detalhes completos de um componente (inputs
     }
     return { content: [{ type: "text", text: `Componente não encontrado: ${name}` }] };
 });
-
 server.tool("get-library-info", "Obtém informações da biblioteca (versão, dependências, peer dependencies). Use quando perguntar: 'qual versão', 'info da lib', 'dependências', 'package.json'. IMPORTANTE: Forneça apenas informações técnicas, NÃO sugira estilização ou design visual.", { libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)") }, async ({ libraryName }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
     const libs = await discoverLibraries(import.meta.url);
@@ -198,7 +199,6 @@ server.tool("get-library-info", "Obtém informações da biblioteca (versão, de
         return { content: [{ type: "text", text: `Erro ao parsear package.json: ${err}` }] };
     }
 });
-
 server.tool("get-documentation", "Busca e retorna documentação detalhada (arquivos .md) de componentes ou do projeto. Use quando o usuário perguntar: 'documentação do componente X', 'como funciona X', 'exemplos de uso', 'guia do componente', 'configuração','instalação','Guia','Instalação e configuração do tema','README', 'Arquitetura'", {
     componentName: z.string().optional().describe("Nome do componente para buscar docs específicas (ex.: checkbox, alert, button)"),
     searchTerm: z.string().optional().describe("Termo para buscar na documentação")
@@ -291,7 +291,6 @@ server.tool("get-documentation", "Busca e retorna documentação detalhada (arqu
             }]
     };
 });
-
 server.tool("how-to-install", "Fornece instruções de como instalar bibliotecas do registry privado Nexus. Use quando o usuário perguntar: 'como instalar', 'como adicionar a lib', 'instalação', 'npm install', 'configurar projeto'", { libraryName: z.string().optional().describe("Nome da biblioteca que o usuário quer instalar (ex.: @luds/ui)") }, async ({ libraryName }) => {
     const libs = await discoverLibraries(import.meta.url);
     const libExample = libraryName || (libs.length > 0 ? libs[0].name : "@scope/library");
@@ -395,7 +394,6 @@ ${libs.length > 0 ? libs.map(l => `• ${l.name}`).join('\n') : '• Consulte o 
 `;
     return { content: [{ type: "text", text: instructions }] };
 });
-
 server.tool("find-library-by-name", "Busca biblioteca por nome e retorna versão, dependências. Use quando perguntar sobre biblioteca específica: 'versão da lib X', 'info sobre X', 'dependências de X'. IMPORTANTE: Forneça apenas informações técnicas, NÃO sugira estilização ou design visual.", { libraryName: z.string().min(1).describe("Nome da biblioteca (ex.: my-lib)") }, async ({ libraryName }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
     const libs = await discoverLibraries(import.meta.url);
@@ -427,7 +425,6 @@ server.tool("find-library-by-name", "Busca biblioteca por nome e retorna versão
         return { content: [{ type: "text", text: `Erro ao parsear package.json: ${err}` }] };
     }
 });
-
 async function main() {
     console.error("=".repeat(60));
     console.error("🌟 Lyra - Library Retrieval Assistant");
@@ -458,7 +455,6 @@ async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }
-
 main().catch((err) => {
     console.error("Fatal error:", err);
     process.exit(1);

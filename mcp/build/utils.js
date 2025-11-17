@@ -188,6 +188,7 @@ async function findPublicApiFallback(workspaceRoot) {
  */
 export function parseLibraryPaths() {
     const paths = [];
+    const delimiter = path.delimiter;
     // 1. Verifica argumentos CLI: --libs path1 path2 path3
     const libsArgIndex = process.argv.indexOf('--libs');
     if (libsArgIndex !== -1) {
@@ -196,9 +197,9 @@ export function parseLibraryPaths() {
             const arg = process.argv[i];
             if (arg.startsWith('--'))
                 break;
-            // Se contém separador, divide
-            if (arg.includes(';') || arg.includes(':')) {
-                paths.push(...arg.split(/[;:]/));
+            // Se contém separador específico da plataforma, divide
+            if (arg.includes(delimiter)) {
+                paths.push(...arg.split(delimiter));
             }
             else {
                 paths.push(arg);
@@ -208,8 +209,10 @@ export function parseLibraryPaths() {
     // 2. Verifica variável de ambiente
     const envPaths = process.env.LIB_COMPONENTS_PATHS;
     if (envPaths) {
-        // Suporta tanto ; quanto : como separador
-        paths.push(...envPaths.split(/[;:]/));
+        // Usa o delimitador de path específico da plataforma
+        // - Windows: ';' (não quebra em 'C:\')
+        // - Unix-like: ':'
+        paths.push(...envPaths.split(delimiter));
     }
     // Remove paths vazios e normaliza
     return paths

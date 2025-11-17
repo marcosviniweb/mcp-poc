@@ -5,7 +5,7 @@ import { z } from "zod";
 import path from "node:path";
 import { resolveWorkspaceRoot, readFileIfExists, discoverLibraries, statIsDirectory } from "./utils.js";
 import { listPotentialComponentFiles, extractComponentInfo } from "./scanner.js";
-import { parseDetailedComponent } from "./docs.js";
+import { parseDetailedComponent, findDocumentationExamples } from "./docs.js";
 import { buildUsageSnippet } from "./parser.js";
 import { findMarkdownFiles, findWorkspaceRoots, getPossibleDocsPaths } from "./markdown-search.js";
 
@@ -151,6 +151,10 @@ server.tool(
       if (found) {
         const detailed = await parseDetailedComponent(found.file, found.name, found.selector, found.standalone, found.type);
         const rel = path.relative(root, detailed.file);
+        
+        // 1. Tenta buscar exemplos da documentação primeiro
+        const docExample = await findDocumentationExamples(found.name, found.file);
+        
         const inputs = (detailed.inputs || []).map((i: any) => {
           const kindLabel = i.kind === 'signal' ? '🔵 signal' : '🟢 decorator';
           const typeInfo = i.resolvedType || i.type || 'any';
@@ -165,7 +169,10 @@ server.tool(
           const desc = o.description ? ` // ${o.description}` : '';
           return `  - ${o.alias || o.name}: ${typeInfo} [${kindLabel}]${desc}`;
         }).join('\n') || '  (nenhum)';
-        const usage = buildUsageSnippet(detailed);
+        
+        // 2. Se não encontrou documentação, gera exemplo sintético
+        const usage = docExample || buildUsageSnippet(detailed);
+        
         const typeLabel = detailed.type === 'directive' ? 'Diretiva' : 'Componente';
         const detail = [
           `Nome: ${detailed.name}`,

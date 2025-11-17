@@ -144,6 +144,61 @@ export function parseSignalOutput(line) {
     }
     return { name: match[1], type: cleanWhitespace(match[2]) };
 }
+/**
+ * Gera exemplo de uso para diretivas compostas (ex: Card com Header, Body, Footer)
+ */
+function buildCompositeDirectiveExample(info) {
+    const selector = info.selector?.replace(/[\[\]]/g, '') || '';
+    const inputs = info.inputs || [];
+    const outputs = info.outputs || [];
+    // Detecta se é uma diretiva "raiz" de um conjunto (Card, FormField, Listbox, etc.)
+    const isRootDirective = /^luds(Card|FormField|Listbox|Menu|Popover|Dialog|Tabs|Accordion)$/i.test(info.name);
+    if (!isRootDirective)
+        return undefined;
+    // Exemplos específicos para diretivas compostas conhecidas
+    if (info.name === 'LudsCard') {
+        const variantBinding = inputs.find(i => i.name === 'variant' || i.alias === 'variant');
+        const sizeBinding = inputs.find(i => i.name === 'size' || i.alias === 'size');
+        return `<!-- Exemplo completo de Card com todas as partes -->
+<div ludsCard ${variantBinding ? '[variant]="\'high-contrast\'"' : ''} ${sizeBinding ? '[size]="\'medium\'"' : ''}>
+  <!-- Barra de ações no topo (opcional) -->
+  <div ludsCardHeaderBar>
+    <button ludsButton>Ação</button>
+  </div>
+  
+  <!-- Container principal do card -->
+  <div ludsCardContainer>
+    <!-- Cabeçalho com ícone (opcional) -->
+    <div ludsCardHeader>
+      <div ludsCardIcon>
+        <ng-icon name="phosphorCard"></ng-icon>
+      </div>
+    </div>
+    
+    <!-- Corpo principal com título e descrição -->
+    <div ludsCardBody>
+      <h3 ludsCardTitle>Título do Card</h3>
+      <p ludsCardDescription>Descrição detalhada do conteúdo.</p>
+      <span ludsCardOptionalText>Informação adicional</span>
+    </div>
+    
+    <!-- Ações laterais (opcional) -->
+    <div ludsCardAction>
+      <button ludsButton>Ver mais</button>
+    </div>
+  </div>
+  
+  <!-- Rodapé com ações finais (opcional) -->
+  <div ludsCardFooter>
+    <button ludsButton>Confirmar</button>
+    <button ludsButton>Cancelar</button>
+  </div>
+</div>
+
+<!-- 💡 DICA: Todas as partes são opcionais. Use apenas o que precisar! -->`;
+    }
+    return undefined;
+}
 export function buildUsageSnippet(info) {
     if (!info.selector)
         return undefined;
@@ -160,22 +215,45 @@ export function buildUsageSnippet(info) {
         const bindingName = o.alias || o.name;
         bindings.push(`(${bindingName})="on${o.name[0].toUpperCase()}${o.name.slice(1)}($event)"`);
     }
-    // Se é uma diretiva (selector começa com [ ou contém [])
+    // Verifica se há exemplo composto específico para esta diretiva
+    const compositeExample = buildCompositeDirectiveExample(info);
+    if (compositeExample) {
+        return `<!-- HTML -->
+<div class="exemplo-container">
+  ${compositeExample.split('\n').join('\n  ')}
+</div>
+
+<!-- CSS (aplicado apenas no container, NÃO no componente) -->
+<style>
+  .exemplo-container {
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    margin: 1rem 0;
+  }
+</style>`;
+    }
+    // Determina se deve usar como diretiva (atributo) ou como elemento
+    // 1. Se é uma diretiva pura (@Directive) → sempre atributo
+    // 2. Se selector tem [ ou ] → sempre atributo
+    // 3. Se é componente wrapper vazio (hostDirectives + template vazio) → usa como elemento
     const isDirective = info.type === 'directive' || selector.startsWith('[') || selector.includes('[');
+    const useAsElement = info.type === 'component' && !isDirective;
     let componentCode = '';
-    if (isDirective) {
-        // Para diretivas, usa <button> ou <div> como elemento host
-        const hostElement = 'button';
+    if (useAsElement) {
+        // Para componentes (incluindo wrappers), usa o selector como elemento
+        const space = bindings.length ? '\n  ' : '';
+        componentCode = bindings.length
+            ? `<${selector}${space}${bindings.join('\n  ')}\n>\n  Conteúdo\n</${selector}>`
+            : `<${selector}>\n  Conteúdo\n</${selector}>`;
+    }
+    else {
+        // Para diretivas puras, usa como atributo em elemento host
+        const hostElement = selector.includes('button') || selector.includes('Button') ? 'button' : 'div';
         const directiveSelector = selector.replace(/[\[\]]/g, ''); // Remove [ e ]
         const space = bindings.length ? ' ' : '';
         componentCode = `<${hostElement}\n  ${directiveSelector}${space}\n  ${bindings.join('\n  ')}\n>\n  Conteúdo\n</${hostElement}>`;
-    }
-    else {
-        // Para componentes, usa o selector como elemento
-        const space = bindings.length ? '\n  ' : '';
-        componentCode = bindings.length
-            ? `<${selector}${space}${bindings.join('\n  ')}\n></${selector}>`
-            : `<${selector}></${selector}>`;
     }
     // Envolve o componente em um container estilizado para melhor apresentação
     const wrappedExample = `<!-- HTML -->

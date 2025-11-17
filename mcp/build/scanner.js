@@ -60,7 +60,18 @@ export async function extractComponentInfo(filePath) {
         const selector = selectorMatch?.[1];
         const standaloneMatch = /standalone\s*:\s*(true|false)/m.exec(metaBlock);
         const standalone = standaloneMatch ? standaloneMatch[1] === 'true' : undefined;
-        infos.push({ name: className, file: filePath, selector, standalone, type: 'component' });
+        // Detecta se usa hostDirectives (componente wrapper de diretiva)
+        const hasHostDirectives = /hostDirectives\s*:\s*\[/.test(metaBlock);
+        const hasEmptyTemplate = /template\s*:\s*[`'"][\s]*[`'"]/m.test(metaBlock);
+        const isDirectiveWrapper = hasHostDirectives && hasEmptyTemplate;
+        infos.push({
+            name: className,
+            file: filePath,
+            selector,
+            standalone,
+            type: 'component',
+            isDirectiveWrapper
+        });
     }
     // Tenta extrair diretivas com decorador @Directive
     const directiveRegex = /@Directive\s*\(\s*\{([\s\S]*?)\}\s*\)\s*export\s+class\s+(\w+)/g;

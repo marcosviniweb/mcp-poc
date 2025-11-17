@@ -10,6 +10,7 @@ export type ComponentInfo = {
   selector?: string;
   standalone?: boolean;
   type?: 'component' | 'directive';
+  isDirectiveWrapper?: boolean; // true se é componente wrapper vazio que usa hostDirectives
   inputs?: Array<{
     name: string;
     alias?: string;
