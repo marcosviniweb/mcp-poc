@@ -1,11 +1,11 @@
 {
-  "name": "mcp-lib-components",
+  "name": "lyra-mcp",
   "version": "1.3.0",
-  "description": "Servidor MCP que lista componentes de bibliotecas Angular com suporte a signals, multi-path e estruturas genéricas",
+  "description": "Lyra - Library Retrieval Assistant: MCP server for Angular component libraries with Signals, multi-path and generic structures support",
   "type": "module",
   "main": "./build/main.js",
   "bin": {
-    "lib-components": "./build/main.js"
+    "lyra": "./build/main.js"
   },
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/main.js', '755')\"",

@@ -1,307 +1,326 @@
-# MCP Server - Angular Library Components (Guia Único Consolidado)
+# 🌟 Lyra - Library Retrieval Assistant
 
-Servidor MCP (Model Context Protocol) que expõe componentes Angular de bibliotecas para IAs, com suporte a Angular Signals (17+) e resolução de tipos importados. Este guia consolida toda a documentação relevante em um único arquivo.
+> **AI-powered MCP server that helps you discover, understand, and use Angular library components through natural language. Built with the Model Context Protocol for seamless integration with AI assistants.**
 
-## 🚀 Visão Geral e Funcionalidades
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
+[![Model Context Protocol](https://img.shields.io/badge/MCP-1.4.0-green.svg)](https://modelcontextprotocol.io/)
+[![Angular](https://img.shields.io/badge/Angular-14%2B-red.svg)](https://angular.io/)
 
-- ✅ Descoberta de componentes em múltiplas bibliotecas e workspaces
-- ✅ Suporte a secondary entry points
-- ✅ Detalhes completos de componentes
-  - Inputs: tipo, obrigatório/opcional, default, descrição
-  - Outputs: tipo, descrição
-  - Kind: 🟢 decorator (Input/Output) e 🔵 signal (input/output)
-  - Tipos importados resolvidos inline (interface, type, enum, class)
-- ✅ Configuração Multi-Path (CLI/env) para analisar bibliotecas de diferentes fontes
-- ✅ Suporte a `.d.ts` (bibliotecas compiladas)
+**[Portuguese (Brazil) Version](./README.pt-BR.md)**
 
-## 📦 Instalação
+---
+
+> :exclamation: **Importante:** To use MCP Servers you must have High Privileges Access approved in Identity Central.
+
+## 🎯 What is Lyra?
+
+**Lyra** (Library Retrieval Assistant) is a Model Context Protocol (MCP) server that enables AI assistants (like GitHub Copilot, Claude, Cursor) to understand and interact with Angular component libraries. It automatically discovers components, their inputs/outputs, signals, and provides usage examples.
+
+### Perfect for:
+- 🏢 **Design Systems** - Document and query component libraries
+- 📚 **Component Libraries** - Make your UI components AI-discoverable
+- 🔄 **Monorepos** - Support for Nx, Angular CLI, and custom structures
+- 🤖 **AI-Powered Development** - Let AI help you use your components correctly
+
+---
+
+## ✨ Key Features
+
+### 🔍 **Smart Component Discovery**
+- ✅ Auto-detects Angular components in multiple library structures
+- ✅ Supports **Nx monorepos** with `tsconfig.base.json` path mappings
+- ✅ Works with **Angular CLI** workspaces
+- ✅ Handles compiled libraries (`.d.ts` files)
+
+### 🎨 **Complete Component Information**
+- ✅ **Inputs**: type, required/optional, default values, descriptions
+- ✅ **Outputs**: type, event descriptions
+- ✅ **Signals**: `input()`, `output()`, `model()` (Angular 17+)
+- ✅ **Decorators**: `@Input()`, `@Output()` (Angular 14+)
+- ✅ **Type Resolution**: Resolves imported interfaces, types, enums inline
+
+### 🛠️ **MCP Tools Available**
+- `list-components` - List all Angular components in the library
+- `get-component` - Get detailed information about a specific component
+- `get-documentation` - Search and retrieve markdown documentation (README, guides, examples)
+- `get-library-info` - Get library metadata (version, dependencies)
+- `find-library-by-name` - Search for a library by name
+- `how-to-install` - Instructions for installing libraries from private Nexus registry
+
+### 📋 **MCP Prompts Available**
+- `no-styling-guidelines` - Guidelines to ensure AI assistants provide ONLY functional component usage without CSS styling suggestions
+
+---
+
+## 🚀 Quick Start
+
+### 1️⃣ Installation
 
 ```bash
+cd mcp
 npm install
 npm run build
 ```
 
-## 💼 Funcionalidades
+### 2️⃣ Configuration
 
-### 🔧 Tools Disponíveis
-- **list-components**: Lista todos os componentes Angular da biblioteca
-- **get-component**: Obtém detalhes completos de um componente (inputs, outputs, selector, uso)
-- **get-library-info**: Obtém informações da biblioteca (versão, dependências, peer dependencies)
-- **find-library-by-name**: Busca biblioteca por nome e retorna versão e dependências
+#### For **GitHub Copilot** (VS Code)
 
-
-## ⚙️ Configuração Multi-Path (Recomendado)
-
-Três formas principais de apontar bibliotecas:
-
-1) Variável de ambiente (Windows usa `;`, Unix/Mac usa `:`)
+Create `.vscode/mcp.json` in your project root:
 
 ```json
 {
-  "mcpServers": {
-    "lib-components": {
-      "command": "node",
-      "args": ["<caminho-absoluto>/mcp/build/main.js"],
-      "env": {
-        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui-lib;<caminho-repos>/custom-lib"
-      }
-    }
-  }
-}
-```
-
-2) Argumentos CLI `--libs` (lista de paths):
-
-```json
-{
-  "mcpServers": {
-    "lib-components": {
+  "servers": {
+    "libray-retrievel-assistent": {
       "command": "node",
       "args": [
-        "<caminho-absoluto>/mcp/build/main.js",
+        "/absolute/path/to/mcp/build/main.js",
         "--libs",
-        "<caminho-do-projeto>/node_modules/@company/ui-lib",
-        "<caminho-repos>/custom-lib"
+        "/path/to/your/angular/workspace"
       ]
     }
   }
 }
 ```
 
-3) Workspace + libs externas via env:
+#### For **Nx Monorepo with Path Mappings** (Recommended)
+
+If your workspace has a `tsconfig.base.json` with path mappings:
 
 ```json
 {
-  "mcpServers": {
-    "lib-components": {
-      "command": "node",
-      "args": ["<caminho-absoluto>/mcp/build/main.js"],
-      "env": {
-        "MCP_WORKSPACE_ROOT": "<caminho-workspace-angular>",
-        "LIB_COMPONENTS_PATHS": "<caminho-outro-projeto>/node_modules/@external/lib"
-      }
-    }
-  }
-}
-```
-
-Ordem de prioridade: CLI `--libs` > env `LIB_COMPONENTS_PATHS` > workspace atual (fallback automático).
-
-Formatos suportados: workspace completo (angular.json/workspace.json), biblioteca específica (package.json + src/), biblioteca compilada (dist/.d.ts), pacotes `node_modules`.
-
-## 🤖 Configuração para GitHub Copilot no VS Code
-
-O GitHub Copilot no Visual Studio Code suporta servidores MCP, permitindo que você estenda as capacidades do Copilot com ferramentas customizadas. Existem duas formas de configurar:
-
-### 📁 Opção 1: Configuração por Repositório (Recomendado para Equipes)
-
-Crie um arquivo `.vscode/mcp.json` na raiz do seu repositório. Isso permite compartilhar a configuração com toda a equipe:
-
-```json
-{
-  "inputs": [],
   "servers": {
-    "angular-lib-components": {
+    "libray-retrievel-assistent": {
       "command": "node",
       "args": [
-        "<caminho-absoluto>/mcp/build/main.js",
+        "/absolute/path/to/mcp/build/main.js",
         "--libs",
-        "${workspaceFolder}/node_modules/@company/ui-lib",
-        "${workspaceFolder}/node_modules/@company/forms-lib"
+        "/path/to/monorepo/root"
       ]
     }
   }
 }
 ```
 
-**Ou usando variáveis de ambiente:**
-
+The server will automatically detect paths like:
 ```json
 {
-  "inputs": [],
-  "servers": {
-    "angular-lib-components": {
-      "command": "node",
-      "args": ["<caminho-absoluto>/mcp/build/main.js"],
-      "env": {
-        "LIB_COMPONENTS_PATHS": "${workspaceFolder}/node_modules/@company/ui-lib;${workspaceFolder}/node_modules/@company/forms-lib"
-      }
-    }
+  "paths": {
+    "@company/ui/components/*": ["libs/ui/components/*/src/index.ts"],
+    "@company/ui/blocks/*": ["libs/ui/blocks/*/src/index.ts"]
   }
 }
 ```
 
-### 👤 Opção 2: Configuração Pessoal (Disponível em Todos os Workspaces)
+### 3️⃣ Usage with AI Assistants
 
-Adicione ao seu `settings.json` do VS Code (Ctrl+Shift+P → "Preferences: Open User Settings (JSON)"):
-
-```json
-{
-  "github.copilot.chat.mcp.enabled": true,
-  "github.copilot.chat.mcp.servers": {
-    "angular-lib-components": {
-      "command": "node",
-      "args": ["<caminho-absoluto>/mcp/build/main.js"],
-      "env": {
-        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/ui-lib;<caminho-do-projeto>/forms-lib"
-      }
-    }
-  }
-}
-```
-
-### 🚀 Como Usar
-
-1. **Iniciar o servidor**: Após configurar, um botão "Start" aparecerá no arquivo `.vscode/mcp.json`. Clique para iniciar o servidor.
-
-2. **Abrir o Copilot Chat**: Clique no ícone do Copilot na barra lateral ou pressione `Ctrl+Alt+I`.
-
-3. **Selecionar Agent**: Na caixa do Copilot Chat, selecione "Agent" no menu.
-
-4. **Ver ferramentas disponíveis**: Clique no ícone de ferramentas (🔧) no canto superior da caixa de chat para ver os servidores MCP e ferramentas disponíveis.
-
-### 🛠️ Ferramentas Disponíveis
-
-O Copilot poderá usar automaticamente estas ferramentas:
-
-- **list-components** - Lista todos os componentes Angular disponíveis
-- **get-component** - Obtém detalhes completos de um componente (inputs, outputs, selector)
-- **get-library-info** - Obtém informações da biblioteca (versão, dependências)
-- **find-library-by-name** - Busca biblioteca por nome
-
-### 💬 Exemplos de Prompts
-
-Depois de configurado, você pode conversar naturalmente com o Copilot:
-
-- "Mostre-me todos os componentes disponíveis na biblioteca"
-- "Como uso o componente ButtonComponent?"
-- "Quais são os inputs e outputs do FormFieldComponent?"
-- "Qual a versão da biblioteca @company/ui-lib?"
-- "Crie um exemplo de uso do componente ReusableIoComponent com todos os inputs"
-- "Liste todos os componentes que têm output de eventos"
-
-### ⚠️ Importante
-
-- **Não use ambas as configurações**: Configurar o mesmo servidor em `.vscode/mcp.json` e `settings.json` pode causar conflitos.
-- **Caminhos absolutos**: Use caminhos absolutos ou a variável `${workspaceFolder}` para evitar problemas.
-- **Separadores**: No Windows use `;` para separar múltiplos paths, no Linux/Mac use `:`.
-
-
-
-
-
-## 🔵 Suporte a Angular Signals e Resolução de Tipos
-
-Exemplo resumido:
-
-```typescript
-import { Component, input, output, Input, Output, EventEmitter } from '@angular/core';
-
-@Component({ selector: 'lib-demo', standalone: true })
-export class DemoComponent {
-  // Signals
-  readonly title = input<string>('Default');
-  readonly count = input.required<number>();
-  
-  // Decorators
-  @Input() validationState?: 'valid' | 'invalid';
-  
-  // Outputs
-  readonly clicked = output<MouseEvent>();
-  @Output() themeChanged = new EventEmitter<string>();
-}
-```
-
-Resultado (resumo): inputs/outputs listados com `kind` (decorator/signal) e tipos resolvidos inline. Suporta interfaces, types, enums e classes importadas.
-
-## 🏗️ Estruturas de Projeto Suportadas
-
-O servidor detecta automaticamente bibliotecas em diferentes estruturas:
-
-```bash
-# Angular CLI padrão
-workspace/projects/my-lib/
-
-# Nx workspace
-workspace/libs/my-lib/
-
-# Monorepo
-workspace/packages/my-lib/
-
-# Biblioteca na raiz
-workspace/my-lib/
-
-# Estrutura customizada (busca recursiva)
-workspace/custom/nested/my-lib/
-```
-
-Identificação de biblioteca: presença de `src/public-api.ts` ou `ng-package.json` (ou `.d.ts` em libs compiladas).
-
-## 🧭 Cenário Nexus/Bitbucket (Resumo)
-
-Para bibliotecas instaladas via Nexus no `node_modules` do projeto, aponte diretamente para os diretórios das libs:
-
-```json
-{
-  "mcpServers": {
-    "lib-components": {
-      "command": "node",
-      "args": ["<caminho-absoluto>/mcp/build/main.js"],
-      "env": {
-        "LIB_COMPONENTS_PATHS": "<caminho-do-projeto>/node_modules/@company/ui;<caminho-do-projeto>/node_modules/@company/forms"
-      }
-    }
-  }
-}
-```
-
-Vantagem: o MCP lê diretamente os `.d.ts` publicados; ao atualizar a versão das libs no projeto, o MCP reflete automaticamente.
-
-## 🐛 Troubleshooting Essencial
-
-- **Nenhuma biblioteca encontrada**: verifique paths, separador correto (`;` no Windows, `:` no Unix), estrutura válida (package.json + src/ ou dist/.d.ts)
-- **Componentes não aparecem**: confirme se há `.component.ts`/`.component.d.ts` e se o entry point exporta os componentes
-- **Separador no Windows**: evite `:`; use `;`
-- **Logs**: abra Developer Tools do Cursor e procure por `[MCP]`
-
-## 🧱 Arquitetura (alto nível)
+Once configured, you can ask your AI assistant:
 
 ```
-mcp/src/
-├── main.ts              # Entry point, define ferramentas MCP
-├── scanner.ts           # Descobre arquivos de componentes
-├── parser.ts            # Extrai inputs/outputs (decorators + signals)
-├── docs.ts              # Parse de docs/comments
-├── exports.ts           # Segue cadeia de re-exports
-├── import-resolver.ts   # Resolve tipos importados
-├── utils.ts             # Utilitários (multi-path, descoberta de libs)
-└── types.ts             # Definições TypeScript
+💬 "List all components in the library"
+💬 "Show me details about ButtonComponent"
+💬 "What are the inputs and outputs of CardComponent?"
+💬 "Create an example using the DataTableComponent"
+💬 "Which components have event outputs?"
 ```
-
-## 🔄 Compatibilidade
-
-- Angular 14, 15, 16 (decorators)
-- Angular 17+ (signals)
-- Nx e Angular CLI workspaces
-- Standalone e module-based components
-
-## 📋 Changelog e Suporte
-
-- Histórico de mudanças: ver `mcp/CHANGELOG.md`
-- Dúvidas: verificar troubleshooting acima e exemplos de configuração
 
 ---
 
-## 🧭 Consolidação: Itens Mesclados, Duplicações e Menos Importantes
+## 🏗️ Supported Project Structures
 
-Este guia consolida o conteúdo de múltiplos arquivos. O que foi mesclado e o que ficou de fora:
+The server automatically detects libraries in various structures:
 
-### Duplicações Mescladas
+### ✅ Nx Monorepo (Recommended)
+```
+workspace/
+├── tsconfig.base.json          # With path mappings
+├── libs/
+│   └── ui/
+│       ├── components/
+│       │   ├── button/src/index.ts
+│       │   └── card/src/index.ts
+│       └── blocks/
+│           ├── form/src/index.ts
+│           └── table/src/index.ts
+```
 
-- Configuração Multi-Path (README, QUICK-START-MULTI-PATH): unificado em "Configuração Multi-Path" + "Quick Start" acima
-- Exemplos de comandos (`list-components`, `get-component`) (README, QUICK-START, SIGNAL-SUPPORT): centralizados em "Uso"
-- Estruturas suportadas (README, GENERIC-STRUCTURE-SUPPORT): resumidas em "Estruturas de Projeto Suportadas"
-- Suporte a Signals e tipos (README, SIGNAL-SUPPORT): condensado em "Suporte a Angular Signals"
-- Cenário Nexus/Bitbucket (NEXUS-BITBUCKET-GUIDE): resumido em "Cenário Nexus/Bitbucket"
+### ✅ Angular CLI Workspace
+```
+workspace/
+├── angular.json
+└── projects/
+    └── my-lib/
+        └── src/public-api.ts
+```
 
+### ✅ Individual Library
+```
+my-lib/
+├── package.json
+├── ng-package.json
+└── src/
+    └── public-api.ts
+```
+
+### ✅ Compiled Library
+```
+dist/my-lib/
+├── package.json
+└── index.d.ts
+```
+
+---
+
+## 🎯 Real-World Example: Lumina Design System
+
+This MCP server was built for the **Lumina Design System**, an Nx monorepo with 38+ components and blocks.
+
+**Configuration:**
+```json
+{
+  "servers": {
+    "libray-retrievel-assistent": {
+      "command": "node",
+      "args": [
+        "C:\\workspace\\mcp-poc\\mcp\\build\\main.js",
+        "--libs",
+        "C:\\workspace\\lumina-design-system"
+      ]
+    }
+  }
+}
+```
+
+**What it discovers:**
+- ✅ 33+ blocks in `libs/ui/blocks/*`
+- ✅ 5+ components in `libs/ui/components/*`
+- ✅ All exported components (LudsCard, LudsButton, LudsTable, etc.)
+
+---
+
+## 🔧 Advanced Configuration
+
+### Multiple Libraries
+
+```json
+{
+  "servers": {
+    "libray-retrievel-assistent": {
+      "command": "node",
+      "args": [
+        "/path/to/mcp/build/main.js",
+        "--libs",
+        "/path/to/workspace1",
+        "/path/to/workspace2",
+        "/path/to/node_modules/@company/ui-lib"
+      ]
+    }
+  }
+}
+```
+
+### Environment Variables (Alternative)
+
+```json
+{
+  "servers": {
+    "libray-retrievel-assistent": {
+      "command": "node",
+      "args": ["/path/to/mcp/build/main.js"],
+      "env": {
+        "LIB_COMPONENTS_PATHS": "/path/to/lib1;/path/to/lib2"
+      }
+    }
+  }
+}
+```
+
+**Note**: On Windows use `;` as separator, on Unix/Mac use `:`
+
+---
+
+## 🧪 Testing & Debugging
+
+### View Logs
+
+**GitHub Copilot (VS Code):**
+- Go to **View → Output**
+- Select **"GitHub Copilot Chat"** from dropdown
+- Look for lines starting with `[MCP]` or `[list-components]`
+
+**Expected output:**
+```
+[MCP] Using configured paths: 1 path(s)
+  - C:\workspace\lumina-design-system
+[MCP] Found 38 library(ies) via tsconfig.base.json paths
+[list-components] Found 38 libraries
+  - luds/ui/blocks/card at C:\workspace\lumina-design-system\libs\ui\blocks\card
+  - luds/ui/blocks/button at C:\workspace\lumina-design-system\libs\ui\blocks\button
+  ...
+```
+
+### Common Issues
+
+#### ❌ No libraries found
+- ✅ Verify paths are absolute
+- ✅ Check separator (`;` on Windows, `:` on Unix/Mac)
+- ✅ Ensure `package.json` exists in library root
+- ✅ Verify structure: must have `src/public-api.ts` OR `.d.ts` files
+
+#### ❌ No components found
+- ✅ Check for `.component.ts` or `.component.d.ts` files
+- ✅ Verify entry point exports components
+- ✅ Check component location: `src/lib/components/` or exported in `public-api.ts`
+
+---
+
+## 🎨 Angular Signals Support
+
+Full support for Angular 17+ signal-based APIs:
+
+```typescript
+import { Component, input, output, model } from '@angular/core';
+
+@Component({ 
+  selector: 'lib-demo', 
+  standalone: true 
+})
+export class DemoComponent {
+  // Signal inputs
+  readonly title = input<string>('Default');
+  readonly count = input.required<number>();
+  
+  // Signal outputs
+  readonly clicked = output<MouseEvent>();
+  
+  // Two-way binding
+  readonly value = model<string>();
+  
+  // Classic decorators (also supported)
+  @Input() theme?: 'light' | 'dark';
+  @Output() changed = new EventEmitter<string>();
+}
+```
+
+The MCP server extracts and displays all this information with proper type resolution.
+
+---
+
+## 🤝 Compatible With
+
+- ✅ **GitHub Copilot** (VS Code)
+- ✅ **Cursor** IDE
+- ✅ **Claude Desktop**
+- ✅ **Any MCP-compatible AI assistant**
+
+---
+
+## 🛠️ Tech Stack
+
+- **TypeScript 5.7+**
+- **Model Context Protocol SDK 1.4.0**
+- **Zod** for schema validation
+- **Node.js 18+**
+
+---
 

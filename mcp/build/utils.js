@@ -218,6 +218,60 @@ export function parseLibraryPaths() {
         .map(p => path.resolve(p));
 }
 /**
+ * Descobre bibliotecas através do tsconfig.base.json paths
+ * Suporta padrões como:
+ * - "@luds/ui/blocks/*": ["libs/ui/blocks/*\/src/index.ts"]
+ * - "@luds/ui/components/*": ["libs/ui/components/*\/src/index.ts"]
+ */
+async function discoverLibrariesFromTsConfig(workspaceRoot) {
+    const tsconfigPath = path.resolve(workspaceRoot, 'tsconfig.base.json');
+    const tsconfig = await readJsonIfExists(tsconfigPath);
+    if (!tsconfig?.compilerOptions?.paths) {
+        return [];
+    }
+    const libs = [];
+    const paths = tsconfig.compilerOptions.paths;
+    for (const [alias, mappings] of Object.entries(paths)) {
+        // Processa apenas aliases com wildcard que apontam para componentes/blocks
+        if (!alias.includes('*'))
+            continue;
+        if (!alias.includes('/components/') && !alias.includes('/blocks/'))
+            continue;
+        for (const mapping of mappings) {
+            // Remove o wildcard e pega o diretório base
+            // Ex: "libs/ui/blocks/*/src/index.ts" -> "libs/ui/blocks"
+            const basePath = mapping.split('/*')[0];
+            const fullBasePath = path.resolve(workspaceRoot, basePath);
+            // Verifica se o diretório existe
+            if (!await statIsDirectory(fullBasePath))
+                continue;
+            // Lista todos os subdiretórios (cada um é uma biblioteca/componente)
+            const entries = await readdirSafe(fullBasePath);
+            for (const entry of entries) {
+                const libRoot = path.resolve(fullBasePath, entry);
+                if (!await statIsDirectory(libRoot))
+                    continue;
+                // Reconstrói o caminho do entry point
+                // Ex: libs/ui/blocks/card/src/index.ts
+                const entryPath = mapping.replace('*', entry);
+                const fullEntryPath = path.resolve(workspaceRoot, entryPath);
+                // Verifica se o entry point existe
+                if (!await readFileIfExists(fullEntryPath))
+                    continue;
+                const name = `${alias.split('/').slice(0, -1).join('/')}/${entry}`.replace('@', '');
+                const sourceRoot = path.dirname(fullEntryPath);
+                libs.push({
+                    name,
+                    root: libRoot,
+                    sourceRoot,
+                    publicApi: fullEntryPath
+                });
+            }
+        }
+    }
+    return libs;
+}
+/**
  * Descobre bibliotecas a partir de um path específico
  * Detecta automaticamente se é: workspace completo, lib específica, ou dist/
  */
@@ -227,7 +281,7 @@ async function discoverLibraryFromPath(libPath) {
         console.error(`[MCP] Caminho não encontrado ou não é um diretório: ${libPath}`);
         return [];
     }
-    // Caso 1: É um workspace completo (tem angular.json ou workspace.json)
+    // Caso 1: É um workspace completo (tem angular.json, workspace.json ou tsconfig.base.json com paths)
     const angularJson = await readFileIfExists(path.resolve(libPath, 'angular.json'));
     if (angularJson) {
         const libs = await discoverFromAngularJson(libPath);
@@ -239,6 +293,15 @@ async function discoverLibraryFromPath(libPath) {
         const libs = await discoverFromNxWorkspace(libPath);
         if (libs.length > 0)
             return libs;
+    }
+    // Tenta descobrir através do tsconfig.base.json (Nx monorepo)
+    const tsconfigBase = await readFileIfExists(path.resolve(libPath, 'tsconfig.base.json'));
+    if (tsconfigBase) {
+        const libs = await discoverLibrariesFromTsConfig(libPath);
+        if (libs.length > 0) {
+            console.error(`[MCP] Encontradas ${libs.length} biblioteca(s) via tsconfig.base.json paths`);
+            return libs;
+        }
     }
     // Caso 2: É uma biblioteca específica (tem package.json e src/ ou dist/)
     const packageJson = await readFileIfExists(path.resolve(libPath, 'package.json'));
@@ -349,6 +412,12 @@ export async function discoverLibraries(importMetaUrl) {
     console.error(`[MCP] Buscando bibliotecas no workspace atual...`);
     const root = await resolveWorkspaceRoot(importMetaUrl);
     console.error(`[MCP] Workspace root: ${root}`);
+    // Tenta tsconfig.base.json primeiro (Nx monorepo)
+    const fromTsConfig = await discoverLibrariesFromTsConfig(root);
+    if (fromTsConfig.length > 0) {
+        console.error(`[MCP] Encontradas ${fromTsConfig.length} biblioteca(s) via tsconfig.base.json`);
+        return fromTsConfig;
+    }
     const fromAngular = await discoverFromAngularJson(root);
     if (fromAngular.length > 0) {
         console.error(`[MCP] Encontradas ${fromAngular.length} biblioteca(s) via angular.json`);

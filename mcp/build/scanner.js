@@ -37,8 +37,9 @@ async function walkComponents(dir, acc = []) {
         if (await statIsDirectory(full)) {
             await walkComponents(full, acc);
         }
-        else if (/\.component\.(ts|d\.ts)$/.test(entry)) {
-            // Suporta tanto .component.ts (código fonte) quanto .component.d.ts (compilado)
+        else if (/\.(component|directive|pipe)\.(ts|d\.ts)$/.test(entry) ||
+            (/\.ts$/.test(entry) && !/\.(spec|test)\.ts$/.test(entry))) {
+            // Inclui: .component.ts, .directive.ts, .pipe.ts e outros .ts (exceto specs)
             acc.push(full);
         }
     }
@@ -59,15 +60,27 @@ export async function extractComponentInfo(filePath) {
         const selector = selectorMatch?.[1];
         const standaloneMatch = /standalone\s*:\s*(true|false)/m.exec(metaBlock);
         const standalone = standaloneMatch ? standaloneMatch[1] === 'true' : undefined;
-        infos.push({ name: className, file: filePath, selector, standalone });
+        infos.push({ name: className, file: filePath, selector, standalone, type: 'component' });
     }
-    // Se não encontrou com @Component, tenta extrair classes Component (arquivos .d.ts)
+    // Tenta extrair diretivas com decorador @Directive
+    const directiveRegex = /@Directive\s*\(\s*\{([\s\S]*?)\}\s*\)\s*export\s+class\s+(\w+)/g;
+    while ((match = directiveRegex.exec(content)) !== null) {
+        const metaBlock = match[1];
+        const className = match[2];
+        const selectorMatch = /selector\s*:\s*['\"]([^'\"]+)['\"]/m.exec(metaBlock);
+        const selector = selectorMatch?.[1];
+        const standaloneMatch = /standalone\s*:\s*(true|false)/m.exec(metaBlock);
+        const standalone = standaloneMatch ? standaloneMatch[1] === 'true' : undefined;
+        infos.push({ name: className, file: filePath, selector, standalone, type: 'directive' });
+    }
+    // Se não encontrou com @Component ou @Directive, tenta extrair classes Component/Directive (arquivos .d.ts)
     if (infos.length === 0) {
         // Suporta: export class, export declare class
-        const classRegex = /export\s+(?:declare\s+)?class\s+(\w+Component)\b/g;
+        const classRegex = /export\s+(?:declare\s+)?class\s+(\w+(?:Component|Directive))\b/g;
         while ((match = classRegex.exec(content)) !== null) {
             const className = match[1];
-            infos.push({ name: className, file: filePath });
+            const type = className.endsWith('Directive') ? 'directive' : 'component';
+            infos.push({ name: className, file: filePath, type });
         }
     }
     return infos;

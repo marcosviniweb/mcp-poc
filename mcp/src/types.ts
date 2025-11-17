@@ -9,6 +9,7 @@ export type ComponentInfo = {
   file: string;
   selector?: string;
   standalone?: boolean;
+  type?: 'component' | 'directive';
   inputs?: Array<{
     name: string;
     alias?: string;

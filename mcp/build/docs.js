@@ -2,10 +2,10 @@ import path from 'node:path';
 import { extractClassBody, extractLeadingComment, parsePropertyLine, parseEventEmitterType, buildUsageSnippet, parseSignalInput, parseSignalOutput } from './parser.js';
 import { readFileIfExists } from './utils.js';
 import { extractImports, enrichTypeInfo } from './import-resolver.js';
-export async function parseDetailedComponent(filePath, className, selector, standalone) {
+export async function parseDetailedComponent(filePath, className, selector, standalone, type) {
     const source = (await readFileIfExists(filePath)) || '';
     const classBlock = extractClassBody(source, className);
-    const result = { name: className, file: filePath, selector, standalone, inputs: [], outputs: [] };
+    const result = { name: className, file: filePath, selector, standalone, type, inputs: [], outputs: [] };
     if (!classBlock)
         return result;
     const imports = extractImports(source);
@@ -47,6 +47,7 @@ export async function parseDetailedComponent(filePath, className, selector, stan
                 const resolvedType = await enrichTypeInfo(filePath, parsed.type, imports);
                 result.inputs.push({
                     name: parsed.name,
+                    alias: parsed.alias,
                     type: parsed.type,
                     required: parsed.required,
                     defaultValue: parsed.defaultValue,
@@ -90,6 +91,7 @@ export async function parseDetailedComponent(filePath, className, selector, stan
                 const resolvedType = await enrichTypeInfo(filePath, parsed.type, imports);
                 result.outputs.push({
                     name: parsed.name,
+                    alias: parsed.alias,
                     type: parsed.type,
                     description,
                     kind: 'signal',

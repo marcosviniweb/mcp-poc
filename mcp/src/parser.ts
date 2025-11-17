@@ -73,8 +73,22 @@ export function generateSampleFromType(type?: string): string | undefined {
  * - readonly name = input<string>();
  * - readonly id = input.required<number>();
  * - readonly config = input<Config>({ default: 'value' });
+ * - readonly checked = input<boolean, BooleanInput>(false, { alias: 'ludsCheckboxChecked' });
  */
-export function parseSignalInput(line: string): { name?: string; type?: string; required?: boolean; defaultValue?: string } {
+export function parseSignalInput(line: string): { name?: string; alias?: string; type?: string; required?: boolean; defaultValue?: string } {
+  // Com alias: readonly name = input<Type, Transform>(defaultValue, { alias: 'customName' })
+  const aliasRegex = /readonly\s+(\w+)\s*=\s*input(?:\.(required))?\s*<([^>]+)>\s*\([^)]*\{[^}]*alias\s*:\s*['\"]([^'\"]+)['\"]/;
+  const aliasMatch = aliasRegex.exec(line);
+  
+  if (aliasMatch) {
+    return {
+      name: aliasMatch[1],
+      alias: aliasMatch[4],
+      required: aliasMatch[2] === 'required',
+      type: cleanWhitespace(aliasMatch[3]?.split(',')[0]), // pega só o primeiro tipo genérico
+    };
+  }
+  
   // readonly name = input<Type>(defaultValue)
   const signalRegex = /readonly\s+(\w+)\s*=\s*input(?:\.(required))?\s*<([^>]+)>\s*\(([^)]*)\)/;
   const match = signalRegex.exec(line);
@@ -95,7 +109,9 @@ export function parseSignalInput(line: string): { name?: string; type?: string; 
   
   const name = match[1];
   const required = match[2] === 'required';
-  const type = cleanWhitespace(match[3]);
+  const typeRaw = match[3];
+  // Se tem vírgula, é um tipo com transform (ex: boolean, BooleanInput)
+  const type = cleanWhitespace(typeRaw?.split(',')[0]);
   const defaultValue = cleanWhitespace(match[4]) || undefined;
   
   return { name, type, required, defaultValue };
@@ -103,9 +119,23 @@ export function parseSignalInput(line: string): { name?: string; type?: string; 
 
 /**
  * Parseia signal output do Angular 17+
- * Exemplo: readonly clicked = output<MouseEvent>();
+ * Exemplo: 
+ * - readonly clicked = output<MouseEvent>();
+ * - readonly checkedChange = output<boolean>({ alias: 'ludsCheckboxCheckedChange' });
  */
-export function parseSignalOutput(line: string): { name?: string; type?: string } {
+export function parseSignalOutput(line: string): { name?: string; alias?: string; type?: string } {
+  // Com alias: readonly name = output<Type>({ alias: 'customName' })
+  const aliasRegex = /readonly\s+(\w+)\s*=\s*output\s*<([^>]+)>\s*\(\s*\{[^}]*alias\s*:\s*['\"]([^'\"]+)['\"]/;
+  const aliasMatch = aliasRegex.exec(line);
+  
+  if (aliasMatch) {
+    return {
+      name: aliasMatch[1],
+      alias: aliasMatch[3],
+      type: cleanWhitespace(aliasMatch[2]),
+    };
+  }
+  
   // readonly name = output<Type>()
   const signalRegex = /readonly\s+(\w+)\s*=\s*output\s*<([^>]+)>\s*\(\s*\)/;
   const match = signalRegex.exec(line);
@@ -125,19 +155,59 @@ export function parseSignalOutput(line: string): { name?: string; type?: string 
 
 export function buildUsageSnippet(info: ComponentInfo): string | undefined {
   if (!info.selector) return undefined;
-  const tag = info.selector;
+  const selector = info.selector;
   const inputs = info.inputs || [];
   const outputs = info.outputs || [];
   const bindings: string[] = [];
+  
   for (const i of inputs) {
-    const sample = generateSampleFromType(i.type) || '...';
-    bindings.push(`[${i.alias || i.name}]=${sample}`);
+    const sample = generateSampleFromType(i.resolvedType || i.type) || '...';
+    const bindingName = i.alias || i.name;
+    bindings.push(`[${bindingName}]="${sample}"`);
   }
+  
   for (const o of outputs) {
-    bindings.push(`(${o.alias || o.name})="on${o.name[0].toUpperCase()}${o.name.slice(1)}($event)"`);
+    const bindingName = o.alias || o.name;
+    bindings.push(`(${bindingName})="on${o.name[0].toUpperCase()}${o.name.slice(1)}($event)"`);
   }
-  const space = bindings.length ? ' ' : '';
-  return `<${tag}${space}${bindings.join(' ')}></${tag}>`;
+  
+  // Se é uma diretiva (selector começa com [ ou contém [])
+  const isDirective = info.type === 'directive' || selector.startsWith('[') || selector.includes('[');
+  
+  let componentCode = '';
+  
+  if (isDirective) {
+    // Para diretivas, usa <button> ou <div> como elemento host
+    const hostElement = 'button';
+    const directiveSelector = selector.replace(/[\[\]]/g, ''); // Remove [ e ]
+    const space = bindings.length ? ' ' : '';
+    componentCode = `<${hostElement}\n  ${directiveSelector}${space}\n  ${bindings.join('\n  ')}\n>\n  Conteúdo\n</${hostElement}>`;
+  } else {
+    // Para componentes, usa o selector como elemento
+    const space = bindings.length ? '\n  ' : '';
+    componentCode = bindings.length 
+      ? `<${selector}${space}${bindings.join('\n  ')}\n></${selector}>`
+      : `<${selector}></${selector}>`;
+  }
+  
+  // Envolve o componente em um container estilizado para melhor apresentação
+  const wrappedExample = `<!-- HTML -->
+<div class="exemplo-container">
+  ${componentCode.split('\n').join('\n  ')}
+</div>
+
+<!-- CSS (aplicado apenas no container, NÃO no componente) -->
+<style>
+  .exemplo-container {
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    margin: 1rem 0;
+  }
+</style>`;
+  
+  return wrappedExample;
 }
 
 
