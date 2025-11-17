@@ -108,8 +108,8 @@ Os componentes JÁ POSSUEM todo o design necessário.`
 
 server.tool(
   "list-components",
-  "Lista todos os componentes Angular da biblioteca. Use quando o usuário perguntar: 'quais componentes', 'liste componentes', 'mostre componentes', 'componentes disponíveis'. ⚠️ IMPORTANTE: Componentes devem ser usados puros (sem class/style neles). Pode usar CSS em containers ao redor.",
-  { libraryName: z.string().optional().describe("Nome da biblioteca (ex.: my-lib)"), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") },
+  "Lista todos os componentes Angular disponíveis. Use quando o usuário perguntar: 'quais componentes', 'liste componentes', 'mostre componentes', 'componentes disponíveis'. ⚠️ IMPORTANTE: NÃO passe libraryName a menos que o usuário especifique uma biblioteca exata (ex: 'luds/ui/blocks/card'). Para ver todos os componentes, deixe libraryName vazio.",
+  { libraryName: z.string().optional().describe("Nome EXATO da biblioteca (ex.: 'luds/ui/blocks/card'). Deixe vazio para listar TODOS os componentes de todas as bibliotecas."), entryPoint: z.string().optional().describe("Nome do entry point secundário (quando houver)") },
   async ({ libraryName, entryPoint }) => {
     const root = await resolveWorkspaceRoot(import.meta.url);
     const libs = await discoverLibraries(import.meta.url);
@@ -121,12 +121,11 @@ server.tool(
 
     const allInfosArrays = await Promise.all(files.map(extractComponentInfo));
     const infos = allInfosArrays.flat();
+    
+    console.error(`[list-components] Componentes extraídos: ${infos.length}`);
+    
     if (infos.length === 0) {
-      if (libs.length > 1 && !libraryName) {
-        const options = libs.map(l => `- ${l.name}`).join('\n');
-        return { content: [{ type: "text", text: `Várias bibliotecas encontradas. Informe libraryName.\nOpções:\n${options}` }] };
-      }
-      return { content: [{ type: "text", text: "Nenhum componente encontrado." }] };
+      return { content: [{ type: "text", text: `Nenhum componente encontrado.\n\nBibliotecas disponíveis:\n${libs.map(l => `- ${l.name}`).join('\n')}` }] };
     }
     const text = infos
       .map((c) => {

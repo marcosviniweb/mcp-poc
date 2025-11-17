@@ -204,16 +204,24 @@ export function parseLibraryPaths(): string[] {
   const paths: string[] = [];
   const delimiter = path.delimiter;
   
+  // Debug: mostra todos os argumentos recebidos
+  console.error(`[MCP] process.argv: ${JSON.stringify(process.argv)}`);
+  
   // 1. Verifica argumentos CLI: --libs path1 path2 path3
   const libsArgIndex = process.argv.indexOf('--libs');
+  console.error(`[MCP] --libs encontrado no índice: ${libsArgIndex}`);
+  
   if (libsArgIndex !== -1) {
     // Coleta todos os argumentos após --libs até encontrar outro flag ou fim
     for (let i = libsArgIndex + 1; i < process.argv.length; i++) {
       const arg = process.argv[i];
+      console.error(`[MCP] Processando argumento[${i}]: ${arg}`);
       if (arg.startsWith('--')) break;
       // Se contém separador específico da plataforma, divide
       if (arg.includes(delimiter)) {
-        paths.push(...arg.split(delimiter));
+        const split = arg.split(delimiter);
+        console.error(`[MCP] Dividindo por delimiter: ${JSON.stringify(split)}`);
+        paths.push(...split);
       } else {
         paths.push(arg);
       }
@@ -223,6 +231,7 @@ export function parseLibraryPaths(): string[] {
   // 2. Verifica variável de ambiente
   const envPaths = process.env.LIB_COMPONENTS_PATHS;
   if (envPaths) {
+    console.error(`[MCP] Variável de ambiente LIB_COMPONENTS_PATHS: ${envPaths}`);
     // Usa o delimitador de path específico da plataforma
     // - Windows: ';' (não quebra em 'C:\')
     // - Unix-like: ':'
@@ -230,10 +239,13 @@ export function parseLibraryPaths(): string[] {
   }
   
   // Remove paths vazios e normaliza
-  return paths
+  const normalized = paths
     .map(p => p.trim())
     .filter(p => p.length > 0)
     .map(p => path.resolve(p));
+  
+  console.error(`[MCP] Paths finais normalizados: ${JSON.stringify(normalized)}`);
+  return normalized;
 }
 
 /**

@@ -6,27 +6,79 @@ import { readFileIfExists, resolveWorkspaceRoot, readdirSafe, statIsDirectory, d
 export async function listPotentialComponentFiles(importMetaUrl: string, libraryName?: string, entryPointName?: string): Promise<string[]> {
   const WORKSPACE_ROOT = await resolveWorkspaceRoot(importMetaUrl);
   const discovered = await discoverLibraries(importMetaUrl);
+  
+  console.error(`[list-components] Bibliotecas descobertas: ${discovered.length}`);
+  
   let targetLib = discovered;
-  if (libraryName) targetLib = discovered.filter((l) => l.name === libraryName);
-  if (targetLib.length === 0 && libraryName) return []; 
-  if (targetLib.length === 0 && discovered.length > 0) targetLib = discovered.slice(0, 1); // fallback: primeira
+  if (libraryName) {
+    console.error(`[list-components] Filtrando por libraryName: ${libraryName}`);
+    targetLib = discovered.filter((l) => l.name === libraryName);
+    
+    if (targetLib.length === 0) {
+      console.error(`[list-components] Nenhuma biblioteca encontrada com nome exato: ${libraryName}`);
+      console.error(`[list-components] Tentando busca parcial (contains)...`);
+      
+      // Tenta busca parcial (ex: "lumina" encontra libs com "lumina" no nome)
+      targetLib = discovered.filter((l) => l.name.toLowerCase().includes(libraryName.toLowerCase()));
+      
+      if (targetLib.length === 0) {
+        console.error(`[list-components] Nenhuma biblioteca encontrada com busca parcial`);
+        console.error(`[list-components] Listando TODAS as bibliotecas disponíveis como fallback`);
+        targetLib = discovered; // Lista tudo se não encontrar
+      } else {
+        console.error(`[list-components] Encontradas ${targetLib.length} biblioteca(s) com busca parcial`);
+      }
+    }
+  }
+  
+  if (targetLib.length === 0 && discovered.length > 0) {
+    console.error(`[list-components] Usando todas as bibliotecas como fallback`);
+    targetLib = discovered;
+  }
+  
+  console.error(`[list-components] Processando ${targetLib.length} biblioteca(s)`);
+  
   const results: string[] = [];
   for (const lib of targetLib) {
+    console.error(`[list-components] Processando lib: ${lib.name} em ${lib.root}`);
+    
     const entryPoints = await getLibraryEntryPoints(lib);
+    console.error(`[list-components] Entry points encontrados: ${entryPoints.length}`);
+    
     const targetEps = entryPointName
       ? entryPoints.filter(e => e.name === entryPointName || e.path.endsWith(entryPointName))
       : entryPoints;
+    
     for (const ep of targetEps) {
+      console.error(`[list-components] Processando entry point: ${ep.entryFile}`);
+      
       const chain = await collectExportChain(ep.entryFile, readFileIfExists);
+      console.error(`[list-components] Arquivos na export chain: ${chain.length}`);
+      
       if (chain.length > 0) {
         results.push(...chain);
         continue;
       }
-      const componentsDir = path.resolve(ep.path, 'src','lib','components');
-      const walked = await walkComponents(componentsDir);
-      results.push(...walked);
+      
+      // Fallback: busca em estruturas comuns
+      const possibleDirs = [
+        path.resolve(ep.path, 'src','lib','components'),
+        path.resolve(ep.path, 'src'),
+        ep.path
+      ];
+      
+      for (const dir of possibleDirs) {
+        const walked = await walkComponents(dir);
+        if (walked.length > 0) {
+          console.error(`[list-components] Encontrados ${walked.length} arquivos em ${dir}`);
+          results.push(...walked);
+          break;
+        }
+      }
     }
   }
+  
+  console.error(`[list-components] Total de arquivos encontrados: ${results.length}`);
   return Array.from(new Set(results));
 }
 
