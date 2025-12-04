@@ -1,0 +1,41 @@
+“Bom dia/boa tarde — Hoje vou apresentar o conceito de Model Context Protocol — MCP — e o Lyra, nosso servidor MCP para bibliotecas de componentes Angular. A apresentação mostra o problema que estamos resolvendo, como o MCP funciona, as funcionalidades do Lyra e, ao final, eu mostro um vídeo institucional e um demo prático para vocês verem o Lyra em ação.”
+
+Problema: perda de contexto na assistência por IA
+
+O problema que vemos hoje é que assistentes de IA muitas vezes precisam que você explique o contexto do zero. Em grandes empresas com muitas bibliotecas e projetos, isso vira um gargalo: desenvolvedores e a IA perdem tempo descobrindo serviços, funcinalidades, ...... 
+
+Pense na Dory, do Procurando Nemo. Ela sempre esquece do contexto e precisa que alguém lhe lembre a cada interação. Sem um 'contexto persistente', uma conversa com Dory começa do zero toda vez. Agora imagine que em vez de Dory, temos o chat que é o LLM e ele não tem contexto e se o problema for externa a aplicação você tem que do zero adicionar informações e ir criando memorias para o chat lhe auxiliar e entender o contexto. 
+
+
+O MCP — Model Context Protocol — é um protocolo/servidor que fornece contexto estruturado para modelos e assistentes de IA. Tudo em tempo real
+
+O diferencial do MCP (e do Lyra) é exatamente isso: ele expande e preserva o contexto — a IA não precisa ser relembrada do zero. Ele puxa dinamicamente informações externas relevantes e as entrega ao assistente no momento certo.
+
+Apresento o Lyra — nosso servidor MCP. Em uma frase: Lyra é um MCP que permite que assistentes de IA entendam e interajam com bibliotecas de componentes Angular
+
+
+“Hoje vimos como o MCP resolve um dos maiores problemas de produtividade: a perda de contexto.
+Com o MCP — e especialmente com o Lyra — esse problema desaparece.
+Ele busca informações automaticamente, mantém o contexto e entende nossas bibliotecas Angular de maneira profunda e confiável.
+Vimos que o Lyra descobre componentes, resolve tipos, mostra exemplos de uso, interage e se conecta com assistentes modernos como Copilot e Cursor.
+
+Mas o Lyra é apenas a ponta do iceberg.
+O verdadeiro potencial está na capacidade de um MCP interagir com múltiplos sistemas e projetos da Serasa ao mesmo tempo.
+Hoje demonstramos o Lyra focado em bibliotecas Angular…
+Mas imagine isso se expandindo para outros repositórios, APIs internas, documentações distribuídas, processos de negócios e ativos de diferentes tribes
+
+Com a evolução natural desse trabalho, podemos construir uma espécie de Agente Serasa:
+um assistente inteligente centralizado, que conhece:
+	• todas as bibliotecas e componentes internos,
+	• as APIs das tribes,
+	• fluxos de negócio,
+	• processos técnicos,
+	• documentação,
+	• melhores práticas,
+	• pipelines,
+	• governança e padrões internos.
+Esse agente seria capaz de responder dúvidas de desenvolvedores, PMs, QAs, gestores e stakeholders — tudo com base em fontes oficiais e atualizadas automaticamente.
+Desenvolvedores ganham velocidade.
+Gestores ganham visibilidade.
+Stakeholders entendem processos e integrações sem depender de múltiplos times.
+É autonomia, governança e produtividade dentro de um único ponto de acesso
